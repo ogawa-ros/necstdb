@@ -117,6 +117,6 @@ class necstdb(object):
     def get_table_name(self):
         name = self.con.execute("SELECT name from sqlite_master where type='table'").fetchall()
         _name_list = [name[i][0] for i in range(len(name))]
-        name_list = _name_list.sort()
+        name_list = sorted(_name_list)
         return name_list
 
