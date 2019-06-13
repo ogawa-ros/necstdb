@@ -4,8 +4,6 @@ import sqlite3
 import pickle
 import pandas
 
-__version__ = '0.0.1'
-
 class necstdb(object):
 
     def __init__(self, dbpath, num=1):
