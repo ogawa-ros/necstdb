@@ -4,8 +4,6 @@ import sqlite3
 import pickle
 import pandas
 
-__version__ = '0.0.1'
-
 class necstdb(object):
 
     def __init__(self, dbpath, num=1):
@@ -116,6 +114,6 @@ class necstdb(object):
 
     def get_table_name(self):
         name = self.con.execute("SELECT name from sqlite_master where type='table'").fetchall()
-        name_list = [name[i][0] for i in range(len(name))]
+        name_list = sorted([name[i][0] for i in range(len(name))])
         return name_list
 
