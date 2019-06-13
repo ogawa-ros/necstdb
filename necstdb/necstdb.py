@@ -6,7 +6,7 @@ import pandas
 
 __version__ = '0.0.1'
 
-class necstsb(object):
+class necstdb(object):
 
     def __init__(self, dbpath, num=1):
         self.dbpath = dbpath
