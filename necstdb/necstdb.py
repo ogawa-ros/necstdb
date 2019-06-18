@@ -1,20 +1,17 @@
 #!/usr/bin/env python3
 
+import os
 import sqlite3
 import pickle
 import pandas
 
 class necstdb(object):
 
-    def __init__(self, dbpath, num=1,table_name,param,values,cur_num = 0,auto_commit = False):
-        self.dbpath = dbpath
-        self.open(self.dbpath)
-        self.mk_cur(num)
-        self.make_table(self.table_name,self.param)
-        self. write(table_name, param, values, cur_num=0)
+    def __init__(self):
+        self.con = None
         pass
+
     def __del__(self):
-        self.con.commit()
         self.con.close()
         return
 
@@ -119,3 +116,31 @@ class necstdb(object):
         name_list = sorted([name[i][0] for i in range(len(name))])
         return name_list
 
+    def insert(self,dbpath,topic_name,data):
+        if self.con is None:
+            if os.path.exits(self.dbpath[:self.dbpath.rfind('/')]):pass
+            else: os.makedirs(self.dbpath[:self.dbpath.rfind('/')])
+             
+            self.open(dbpath)
+        else:
+            if self.last_dbpath != dbpath:  
+                self.finalize()
+
+                if os.path.exits(self.dbpath[:self.dbpath.rfind('/')]):pass  
+                else: os.makedirs(self.dbpath[:self.dbpath.rfind('/')]) 
+        
+                self.open(dbpath)
+            else:pass
+
+        self.make_table('raw_data',"(topic_name, data)")
+        # pythonでifにするとSQLでif not existsするの、どっちが速い？
+
+        self.write('raw_data', "", (topic_name,data), cur_num = 1, auto_commit = False)
+        self.last_path = path
+        return
+
+    def finalize(self):
+        self.commit_data()
+        self.con.close()
+        self.con = None
+        return
