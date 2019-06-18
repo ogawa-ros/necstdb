@@ -6,13 +6,15 @@ import pandas
 
 class necstdb(object):
 
-    def __init__(self, dbpath, num=1):
+    def __init__(self, dbpath, num=1,table_name,param,values,cur_num = 0,auto_commit = False):
         self.dbpath = dbpath
         self.open(self.dbpath)
         self.mk_cur(num)
+        self.make_table(self.table_name,self.param)
+        self. write(table_name, param, values, cur_num=0)
         pass
-
     def __del__(self):
+        self.con.commit()
         self.con.close()
         return
 
