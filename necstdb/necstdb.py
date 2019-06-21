@@ -125,6 +125,9 @@ class necstdb(object):
         return
 
     def finalize(self):
-        self.commit_data()
-        self.close()
+        if self.con is None:
+            pass
+        else:
+            self.commit_data()
+            self.close()
         return
