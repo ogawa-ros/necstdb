@@ -13,10 +13,6 @@ class necstdb(object):
         self.db_path = ''
         pass
 
-    def __del__(self):
-        self.con.close()
-        return
-
     def _check_status(self):
         pass
 
@@ -70,18 +66,15 @@ class necstdb(object):
     def read(self, param="*"):
         table_name = 'necst'
         row = self.cur.execute("SELECT {0} from {1}".format(param, table_name)).fetchall()
-        if not row == []:
-            data = [[row[i][j] for i in range(len(row))] 
-                    for j in range(len(row[0]))]
-        else : data = []
+        print(row)
+        if row == []: data = []
+        else: data = [[i[j] for i in row] for j in range(len(row[0]))]
         dat = []
-        for i in range(len(data)):
-            if type(data[i][0]) == bytes:
-                dat.append([pickle.loads(data[i][j]) for j in range(len(data[i]))])
-            else:
-                dat.append(data[i])
+        for i in data:
+            if type(i[0]) == bytes: dat.append([pickle.loads(j) for j in i])
+            else: dat.append(i)
         return dat
-
+    
     def read_as_pandas(self):
         table_name = 'necst'
         df = pandas.read_sql("SELECT * from {}".format(table_name), self.con)
@@ -92,7 +85,7 @@ class necstdb(object):
 #    def read_pandas_all(self):
 #        table_name = self.get_table_name()
 #        datas = [self.read_as_pandas(name) for name in table_name]
-#        if datas ==[]:
+#        if datas == []:
 #            df_all = []
 #        else:
 #            df_all = pandas.concat(datas, axis=1)
@@ -105,7 +98,7 @@ class necstdb(object):
 
     def get_table_name(self):
         name = self.con.execute("SELECT name from sqlite_master where type='table'").fetchall()
-        name_list = sorted([name[i][0] for i in range(len(name))])
+        name_list = sorted([i[0] for i in name])
         return name_list
 
     def insert(self, dic):
