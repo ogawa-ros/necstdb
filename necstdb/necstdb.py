@@ -66,7 +66,6 @@ class necstdb(object):
     def read(self, param="*"):
         table_name = 'necst'
         row = self.cur.execute("SELECT {0} from {1}".format(param, table_name)).fetchall()
-        print(row)
         if row == []: data = []
         else: data = [[i[j] for i in row] for j in range(len(row[0]))]
         dat = []
@@ -118,7 +117,7 @@ class necstdb(object):
         return
 
     def finalize(self):
-        if con is None: pass
+        if self.con is None: pass
         else:
             self.commit_data()
             self.close()
