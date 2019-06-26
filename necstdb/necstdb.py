@@ -48,57 +48,36 @@ class necstdb(object):
         values = tuple(val)
         self.cur.execute("INSERT into {0} {1} values ({2})".format(table_name, param, quest), values)
         return
-        
-#    def writemany(self, table_name, param, values, auto_commit = False):
-#        if len(values[0]) == 1:
-#            quest = "?"
-#        else:
-#            tmp = ""
-#            quest = ",".join([tmp + "?" for i in range(len(values[0]))])
-#
-#        if auto_commit:
-#            with self.con:
-#                self.cur.executemany("INSERT into {0} {1} values ({2})".format(table_name, param, quest), values)
-#        else:
-#            self.cur.executemany("INSERT into {0} {1} values ({2})".format(table_name, param, quest), values)
-#        return
-
+    
     def read(self, param="*"):
         table_name = 'necst'
-        row = self.cur.execute("SELECT {0} from {1}".format(param, table_name)).fetchall()
-        if row == []: data = []
-        else: data = [[i[j] for i in row] for j in range(len(row[0]))]
-        dat = []
-        for i in data:
-            if type(i[0]) == bytes: dat.append([pickle.loads(j) for j in i])
-            else: dat.append(i)
-        return dat
+        self.cur.execute("SELECT {0} from {1}".format(param, table_name))
+        ret = []
+        for row in self.cur.fetchall():
+            dic = dict(zip([d[0] for d in self.cur.description], row))
+            dic['msgs'] = pickle.loads(dic['msgs'])
+            ret.append(dic)
+        return ret
     
     def read_as_pandas(self):
         table_name = 'necst'
-        df = pandas.read_sql("SELECT * from {}".format(table_name), self.con)
-        for i in range(len(df['msgs'])):
-            df.loc[i, 'msgs'] = [pickle.loads(df['msgs'][i])]
-        return df
-
-#    def read_pandas_all(self):
-#        table_name = self.get_table_name()
-#        datas = [self.read_as_pandas(name) for name in table_name]
-#        if datas == []:
-#            df_all = []
-#        else:
-#            df_all = pandas.concat(datas, axis=1)
-#        return df_all
+        ret = pandas.read_sql("SELECT * from {}".format(table_name), self.con)
+        for i in ret.index:
+            ret.at[i, 'msgs'] = [pickle.loads(ret['msgs'][i])]
+        return ret
 
     def check_table(self):
-        row = self.con.execute("SELECT * from sqlite_master")
-        info = row.fetchall()
-        return info
+        self.cur.execute("SELECT * from sqlite_master")
+        ret = self.cur.fetchall()
+        return ret
 
     def get_table_name(self):
-        name = self.con.execute("SELECT name from sqlite_master where type='table'").fetchall()
-        name_list = sorted([i[0] for i in name])
-        return name_list
+        self.cur.execute("SELECT name from sqlite_master where type='table'")
+        ret = sorted([i[0] for i in self.cur.fetchall()])
+        return ret
+
+
+###=== for necst-core/logger ===###
 
     def insert(self, dic):
         if self.con is None:
@@ -122,3 +101,4 @@ class necstdb(object):
             self.commit_data()
             self.close()
         return
+
