@@ -13,11 +13,7 @@ class necstdb(object):
         self.db_path = ''
         pass
 
-    def _check_status(self):
-        pass
-
     def open(self, db_path):
-        self._check_status()
         self.db_path = db_path
         self.con = sqlite3.connect(db_path, check_same_thread=False)
         self.con.execute("CREATE table if not exists 'necst' ('topic', 'time', 'msgs')")
@@ -25,12 +21,10 @@ class necstdb(object):
         return
         
     def commit_data(self):
-        self._check_status()
         self.con.commit()
         return
 
     def close(self):
-        self._check_status()
         self.con.close()
         self.db_path = ''
         self.con = None
