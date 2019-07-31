@@ -17,7 +17,7 @@ class necstdb(object):
             pass
 
         self.path = path
-        path.mkdir(exist_ok=True)
+        path.mkdir(parent=True, exist_ok=True)
         return
 
     def list_tables(self):
