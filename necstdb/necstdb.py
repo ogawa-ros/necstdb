@@ -24,7 +24,7 @@ class necstdb(object):
         return [t.stem for t in self.path.glob('*.data')]
 
     def create_table(self, name, config):
-        list = list_tables()
+        list = self.list_tables()
         if name in list:
             pass
         else:
