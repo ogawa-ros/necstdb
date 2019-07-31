@@ -66,7 +66,7 @@ class table(object):
         return
 
     def close(self):
-        fdata.close()
+        self.fdata.close()
         return
 
     def append(self, *data):
