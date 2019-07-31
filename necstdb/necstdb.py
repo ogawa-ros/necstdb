@@ -45,6 +45,8 @@ class table(object):
     dbpath = ''
     fdata = None
     header = {}
+    record_size = 0
+    format = ''
 
     def __init__(self, dbpath, name, mode):
         self.dbpath = dbpath
@@ -52,17 +54,19 @@ class table(object):
         pass
 
     def open(self, table, mode):
-        data = self.dbpath / (table + '.data')
-        header = self.dbpath / (table + '.header')
+        pdata = self.dbpath / (table + '.data')
+        pheader = self.dbpath / (table + '.header')
 
-        if not(data.exists() and header.exists()):
+        if not(pdata.exists() and pheader.exists()):
             raise(Exception("table '{name}' does not exist".format(**locals())))
 
-        self.fdata = open(data, mode)
-        fheader = open(header, 'r')
-        self.header = json.load(fheader)
-        fheader.close()
+        self.fdata = pdata.open(mode)
+        with pheader.open('r') as fheader:
+            self.header = json.load(fheader)
+            pass
+        
         self.record_size = sum([h['size'] for h in self.header['data']])
+        self.format = ''.join([h['format'] for h in self.header['data']])
         return
 
     def close(self):
@@ -70,8 +74,7 @@ class table(object):
         return
 
     def append(self, *data):
-        format = ''.join([h['format'] for h in self.header['data']])
-        self.fdata.write(struct.pack(format, *data))
+        self.fdata.write(struct.pack(self.format, *data))
         return
 
     def read(self, num=-1, start=0, cols=[], astype=None):
