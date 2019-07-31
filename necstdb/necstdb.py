@@ -6,35 +6,35 @@ import struct
 
 class necstdb(object):
     path = ''
-
+    
     def __init__(self, path):
         self.opendb(path)
         pass
-
+    
     def opendb(self, path):
         if not isinstance(path, pathlib.Path):
             path = pathlib.Path(path)
             pass
-
+        
         self.path = path
         path.mkdir(parents=True, exist_ok=True)
         return
-
+    
     def list_tables(self):
         return [t.stem for t in self.path.glob('*.data')]
-
+    
     def create_table(self, name, config):
-        list = self.list_tables()
-        if name in list:
-            pass
-        else:
-            data = self.path / (name + '.data')
-            data.touch()
-            header = self.path / (name + '.header')
-            with header.open(mode='w') as f:
-                json.dump(config,f)
-                pass
+        if name in self.list_tables():
             return
+        
+        pdata = self.path / (name + '.data')
+        pheader = self.path / (name + '.header')
+        
+        pdata.touch()
+        with pheader.open('w') as f:
+            json.dump(config, f)
+            pass
+        return
 
     def open_table(self, name, mode='rb'):
         table_ = table(self.path, name, mode)
