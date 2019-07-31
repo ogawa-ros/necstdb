@@ -1,8 +1,11 @@
 #!/usr/bin/env python3
 
-import json
-import pathlib
+import os
+import mmap
 import struct
+import pathlib
+import json
+
 
 class necstdb(object):
     path = ''
@@ -78,38 +81,50 @@ class table(object):
         return
 
     def read(self, num=-1, start=0, cols=[], astype=None):
-        self.fdata.seek(start * self.record_size)
+        mm = mmap.mmap(self.fdata.fileno(), 0, prot=mmap.PROT_READ)
+        mm.seek(start * self.record_size)
 
         if cols == []:
-            d = self._read_all_cols(num)
+            d = self._read_all_cols(mm, num)
         else:
-            d = self._read_specified_cols(num, cols)
+            d = self._read_specified_cols(mm, num, cols)
             pass
 
         return self._astype(d, cols, astype)
 
-    def _read_all_cols(self, num):
+    def _read_all_cols(self, mm, num):
         if num == -1:
             size = num
         else:
             size = num * self.record_size
             pass
-        return self.fdata.read(size)
+        return mm.read(size)
+    
+    def _read_specified_cols(self, mm, num, cols):
+        commands = []
+        for _col in self.header['data']:
+            if _col['key'] in cols:
+                commands.append({'cmd': 'read', 'size': _col['size']})
+            else:
+                commands.append({'cmd': 'seek', 'size': _col['size']})
+                pass
+            continue
 
-    def _read_specified_cols(self, num, cols):
-        sizes = []
-        seeks = []
-        i = 0
+        if num == -1:
+            num = (mm.size() - mm.tell()) // self.record_size
+        
         draw = b''
-        while i < num:
-            for size, seek in zip(sizes, seeks):
-                draw += self.fdata.read(size)
-                self.fdata.seek(seek, 1)
+        for i in range(num):
+            for _cmd in commands:
+                if _cmd['cmd'] == 'seek':
+                    mm.seek(_cmd['size'], os.SEEK_CUR)
+                elif _cmd['cmd'] == 'read':
+                    draw += mm.read(_cmd['size'])
+                    pass
                 continue
-            i += 1
             continue
         return draw
-
+    
     def _astype(self, data, cols, astype):
         if cols == []:
             cols = self.header['data']
@@ -119,10 +134,13 @@ class table(object):
 
         if astype in [None, 'tuple']:
             return self._astype_tuple(data, cols)
-        if astype in ['dict']:
+        
+        elif astype in ['dict']:
             return self._astype_dict(data, cols)
+        
         elif astype in ['pandas']:
             return self._astype_pandas(data, cold)
+        
         return
 
     def _astype_tuple(self, data, cols):
