@@ -40,8 +40,7 @@ class necstdb(object):
         return
 
     def open_table(self, name, mode='rb'):
-        table_ = table(self.path, name, mode)
-        return table_
+        return table(self.path, name, mode)
 
 
 class table(object):
@@ -109,7 +108,7 @@ class table(object):
                 commands.append({'cmd': 'seek', 'size': _col['size']})
                 pass
             continue
-
+        
         if num == -1:
             num = (mm.size() - mm.tell()) // self.record_size
         
@@ -144,8 +143,8 @@ class table(object):
         return
 
     def _astype_tuple(self, data, cols):
-        format = ''.join([c['format'] for c in cols])
-        return tuple(struct.iter_unpack(format, data))
+        fmt = ''.join([c['format'] for c in cols])
+        return tuple(struct.iter_unpack(fmt, data))
 
 
 def opendb(path):
