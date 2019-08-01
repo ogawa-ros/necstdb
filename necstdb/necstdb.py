@@ -79,7 +79,7 @@ class table(object):
         self.fdata.write(struct.pack(self.format, *data))
         return
 
-    def read(self, num=-1, start=0, cols=[], astype=None):
+    def read(self, num=-1, start=0, cols=[], astype='tuple'):
         mm = mmap.mmap(self.fdata.fileno(), 0, prot=mmap.PROT_READ)
         mm.seek(start * self.record_size)
 
@@ -117,7 +117,7 @@ class table(object):
             for _cmd in commands:
                 if _cmd['cmd'] == 'seek':
                     mm.seek(_cmd['size'], os.SEEK_CUR)
-                elif _cmd['cmd'] == 'read':
+                else:
                     draw += mm.read(_cmd['size'])
                     pass
                 continue
@@ -130,15 +130,18 @@ class table(object):
         else:
             cols = [c for c in self.header['data'] if c['key'] in cols]
             pass
-
-        if astype in [None, 'tuple']:
+        
+        if astype in ['tuple']:
             return self._astype_tuple(data, cols)
         
         elif astype in ['dict']:
             return self._astype_dict(data, cols)
         
         elif astype in ['pandas']:
-            return self._astype_pandas(data, cold)
+            return self._astype_pandas(data, cols)
+
+        elif astype in ['buffer', 'raw']:
+            return data
         
         return
 
@@ -146,6 +149,26 @@ class table(object):
         fmt = ''.join([c['format'] for c in cols])
         return tuple(struct.iter_unpack(fmt, data))
 
+    def _astype_dict(self, data, cols):
+        count = 0
+        dictlist = []
+        while count < len(data):
+            dict_ = {}
+            
+            for c in cols:
+                d = struct.unpack(c['format'], data[count:count+c['size']])
+                if len(d) == 1:
+                    d = d[0]
+                    pass
+                dict_[c['key']] = d
+                count += c['size']
+                continue
+            
+            dictlist.append(dict_)
+            continue
+            
+        return dictlist
+    
 
 def opendb(path):
     return necstdb(path)
