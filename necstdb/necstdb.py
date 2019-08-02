@@ -28,7 +28,7 @@ class necstdb(object):
         return
     
     def list_tables(self):
-        return [t.stem for t in self.path.glob('*.data')]
+        return sorted([t.stem for t in self.path.glob('*.data')])
     
     def create_table(self, name, config):
         if name in self.list_tables():
@@ -56,7 +56,32 @@ class necstdb(object):
         tar.close()
         return
 
+    def get_info(self):
+        names = self.list_tables()
         
+        dictlist = []
+        for name in names:
+            table = self.open_table(name)
+            dic = {
+                'table name': name,
+                'file size': table.stat.st_size,
+                '#records': table.nrecords,
+                'record size': table.record_size,
+                'format': table.format,
+            }
+            dictlist.append(dic)
+            continue
+
+        df = pandas.DataFrame(
+            dictlist,
+            columns = ['table name',
+                       'file size',
+                       '#records',
+                       'record size',
+                       'format']
+        ).set_index('table name')
+        
+        return df
 
 
 class table(object):
@@ -65,19 +90,21 @@ class table(object):
     header = {}
     record_size = 0
     format = ''
-
+    stat = None
+    nrecords = 0
+    
     def __init__(self, dbpath, name, mode):
         self.dbpath = dbpath
         self.open(name, mode)
         pass
-
+    
     def open(self, table, mode):
         pdata = self.dbpath / (table + '.data')
         pheader = self.dbpath / (table + '.header')
-
+        
         if not(pdata.exists() and pheader.exists()):
             raise(Exception("table '{name}' does not exist".format(**locals())))
-
+        
         self.fdata = pdata.open(mode)
         with pheader.open('r') as fheader:
             self.header = json.load(fheader)
@@ -85,8 +112,10 @@ class table(object):
         
         self.record_size = sum([h['size'] for h in self.header['data']])
         self.format = ''.join([h['format'] for h in self.header['data']])
+        self.stat = pdata.stat()
+        self.nrecords = self.stat.st_size // self.record_size
         return
-
+    
     def close(self):
         self.fdata.close()
         return
