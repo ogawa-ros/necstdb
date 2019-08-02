@@ -6,6 +6,9 @@ import struct
 import pathlib
 import json
 
+import numpy
+import pandas
+
 
 class necstdb(object):
     path = ''
@@ -137,8 +140,11 @@ class table(object):
         elif astype in ['dict']:
             return self._astype_dict(data, cols)
         
-        elif astype in ['pandas']:
-            return self._astype_pandas(data, cols)
+        elif astype in ['structuredarray', 'structured_array', 'array', 'sa']:
+            return self._astype_structured_array(data, cols)
+        
+        elif astype in ['dataframe', 'data_frame', 'pandas']:
+            return self._astype_data_frame(data, cols)
 
         elif astype in ['buffer', 'raw']:
             return data
@@ -168,6 +174,31 @@ class table(object):
             continue
             
         return dictlist
+
+    def _astype_data_frame(self, data, cols):
+        d = self._astype_dict(data, cols)
+        return pandas.DataFrame.from_dict(d)
+    
+    def _astype_structured_array(self, data, cols):
+        def struct2arrayprotocol(fmt):
+            fmt = fmt.replace('c', 'S')
+            fmt = fmt.replace('h', 'i2')
+            fmt = fmt.replace('H', 'u2')
+            fmt = fmt.replace('i', 'i4')
+            fmt = fmt.replace('I', 'u4')
+            fmt = fmt.replace('l', 'i4')
+            fmt = fmt.replace('L', 'u4')
+            fmt = fmt.replace('q', 'i8')
+            fmt = fmt.replace('Q', 'u8')
+            fmt = fmt.replace('f', 'f4')
+            fmt = fmt.replace('d', 'f8')
+            fmt = fmt.replace('s', 'S')
+            return fmt
+        
+        keys = [c['key'] for c in cols]
+        fmt = [struct2arrayprotocol(c['format']) for c in cols]
+
+        return numpy.frombuffer(data, [(k, f) for k, f in zip(keys, fmt)]) 
     
 
 def opendb(path):
