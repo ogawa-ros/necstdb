@@ -70,6 +70,7 @@ class necstdb(object):
                 'format': table.format,
             }
             dictlist.append(dic)
+            table.close()
             continue
 
         df = pandas.DataFrame(
