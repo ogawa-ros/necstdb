@@ -5,6 +5,7 @@ import mmap
 import struct
 import pathlib
 import json
+import tarfile
 
 import numpy
 import pandas
@@ -44,6 +45,18 @@ class necstdb(object):
 
     def open_table(self, name, mode='rb'):
         return table(self.path, name, mode)
+
+    def checkout(self, saveto, compression=None):
+        mode = 'w:'
+        if compression is not None:
+            mode += compression
+            pass
+        tar = tarfile.open(saveto, mode=mode)
+        tar.add(self.path)
+        tar.close()
+        return
+
+        
 
 
 class table(object):
