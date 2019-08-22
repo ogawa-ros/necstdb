@@ -12,8 +12,7 @@ import pandas
 
 
 class necstdb(object):
-    path = ''
-    mode = 'r'
+ 
     def __init__(self, path, mode):
         self.opendb(path, mode)
         pass
@@ -22,17 +21,16 @@ class necstdb(object):
         if not isinstance(path, pathlib.Path):
             path = pathlib.Path(path)
             pass
+        
+        if path.exists() == True:
+            pass
 
-        self.path = path
+        else:
+            if mode == 'w':
+                path.mkdir(parents=True)
 
-        if mode == 'w':
-            path.mkdir(parents=True, exist_ok=True)
-
-        if mode == 'r':
-            if path.exists() == False:
-                self.path = ''
-
-            else:pass
+            elif mode == 'r':
+                raise Exception ('this directory not exist!!')
         return
 
     def list_tables(self):
@@ -252,5 +250,5 @@ class table(object):
         return numpy.frombuffer(data, [(k, f) for k, f in zip(keys, fmt)])
 
 
-def opendb(path, mode = 'r'):
+def opendb(path, mode='r'):
     return necstdb(path, mode)
