@@ -13,18 +13,26 @@ import pandas
 
 class necstdb(object):
     path = ''
-    
-    def __init__(self, path):
-        self.opendb(path)
+    mode = 'r'
+    def __init__(self, path, mode):
+        self.opendb(path, mode)
         pass
     
-    def opendb(self, path):
+    def opendb(self, path, mode):
         if not isinstance(path, pathlib.Path):
             path = pathlib.Path(path)
             pass
         
         self.path = path
-        path.mkdir(parents=True, exist_ok=True)
+        
+        if mode = 'w':
+            path.mkdir(parents=True, exist_ok=True)
+        
+        if mode = 'r':
+            if path.exits() == False:
+                self.path = ''
+
+            else:pass
         return
     
     def list_tables(self):
@@ -244,5 +252,5 @@ class table(object):
         return numpy.frombuffer(data, [(k, f) for k, f in zip(keys, fmt)]) 
     
 
-def opendb(path):
-    return necstdb(path)
+def opendb(path, mode = 'r'):
+    return necstdb(path, mode)
