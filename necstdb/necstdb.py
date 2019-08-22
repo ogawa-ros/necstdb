@@ -17,34 +17,34 @@ class necstdb(object):
     def __init__(self, path, mode):
         self.opendb(path, mode)
         pass
-    
+
     def opendb(self, path, mode):
         if not isinstance(path, pathlib.Path):
             path = pathlib.Path(path)
             pass
-        
+
         self.path = path
-        
-        if mode = 'w':
+
+        if mode == 'w':
             path.mkdir(parents=True, exist_ok=True)
-        
-        if mode = 'r':
-            if path.exits() == False:
+
+        if mode == 'r':
+            if path.exists() == False:
                 self.path = ''
 
             else:pass
         return
-    
+
     def list_tables(self):
         return sorted([t.stem for t in self.path.glob('*.data')])
-    
+
     def create_table(self, name, config):
         if name in self.list_tables():
             return
-        
+
         pdata = self.path / (name + '.data')
         pheader = self.path / (name + '.header')
-        
+
         pdata.touch()
         with pheader.open('w') as f:
             json.dump(config, f)
@@ -66,7 +66,7 @@ class necstdb(object):
 
     def get_info(self):
         names = self.list_tables()
-        
+
         dictlist = []
         for name in names:
             table = self.open_table(name)
@@ -89,7 +89,7 @@ class necstdb(object):
                        'record size',
                        'format']
         ).set_index('table name')
-        
+
         return df
 
 
@@ -101,30 +101,30 @@ class table(object):
     format = ''
     stat = None
     nrecords = 0
-    
+
     def __init__(self, dbpath, name, mode):
         self.dbpath = dbpath
         self.open(name, mode)
         pass
-    
+
     def open(self, table, mode):
         pdata = self.dbpath / (table + '.data')
         pheader = self.dbpath / (table + '.header')
-        
+
         if not(pdata.exists() and pheader.exists()):
             raise(Exception("table '{name}' does not exist".format(**locals())))
-        
+
         self.fdata = pdata.open(mode)
         with pheader.open('r') as fheader:
             self.header = json.load(fheader)
             pass
-        
+
         self.record_size = sum([h['size'] for h in self.header['data']])
         self.format = ''.join([h['format'] for h in self.header['data']])
         self.stat = pdata.stat()
         self.nrecords = self.stat.st_size // self.record_size
         return
-    
+
     def close(self):
         self.fdata.close()
         return
@@ -152,7 +152,7 @@ class table(object):
             size = num * self.record_size
             pass
         return mm.read(size)
-    
+
     def _read_specified_cols(self, mm, num, cols):
         commands = []
         for _col in self.header['data']:
@@ -162,10 +162,10 @@ class table(object):
                 commands.append({'cmd': 'seek', 'size': _col['size']})
                 pass
             continue
-        
+
         if num == -1:
             num = (mm.size() - mm.tell()) // self.record_size
-        
+
         draw = b''
         for i in range(num):
             for _cmd in commands:
@@ -177,29 +177,29 @@ class table(object):
                 continue
             continue
         return draw
-    
+
     def _astype(self, data, cols, astype):
         if cols == []:
             cols = self.header['data']
         else:
             cols = [c for c in self.header['data'] if c['key'] in cols]
             pass
-        
+
         if astype in ['tuple']:
             return self._astype_tuple(data, cols)
-        
+
         elif astype in ['dict']:
             return self._astype_dict(data, cols)
-        
+
         elif astype in ['structuredarray', 'structured_array', 'array', 'sa']:
             return self._astype_structured_array(data, cols)
-        
+
         elif astype in ['dataframe', 'data_frame', 'pandas']:
             return self._astype_data_frame(data, cols)
 
         elif astype in ['buffer', 'raw']:
             return data
-        
+
         return
 
     def _astype_tuple(self, data, cols):
@@ -211,7 +211,7 @@ class table(object):
         dictlist = []
         while count < len(data):
             dict_ = {}
-            
+
             for c in cols:
                 d = struct.unpack(c['format'], data[count:count+c['size']])
                 if len(d) == 1:
@@ -220,16 +220,16 @@ class table(object):
                 dict_[c['key']] = d
                 count += c['size']
                 continue
-            
+
             dictlist.append(dict_)
             continue
-            
+
         return dictlist
 
     def _astype_data_frame(self, data, cols):
         d = self._astype_dict(data, cols)
         return pandas.DataFrame.from_dict(d)
-    
+
     def _astype_structured_array(self, data, cols):
         def struct2arrayprotocol(fmt):
             fmt = fmt.replace('c', 'S')
@@ -245,12 +245,12 @@ class table(object):
             fmt = fmt.replace('d', 'f8')
             fmt = fmt.replace('s', 'S')
             return fmt
-        
+
         keys = [c['key'] for c in cols]
         fmt = [struct2arrayprotocol(c['format']) for c in cols]
 
-        return numpy.frombuffer(data, [(k, f) for k, f in zip(keys, fmt)]) 
-    
+        return numpy.frombuffer(data, [(k, f) for k, f in zip(keys, fmt)])
+
 
 def opendb(path, mode = 'r'):
     return necstdb(path, mode)
