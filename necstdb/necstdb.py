@@ -150,11 +150,13 @@ class table(object):
     format = ''
     stat = None
     nrecords = 0
+    endian = ''
 
     def __init__(
         self, dbpath: pathlib.Path, name: str, mode: str, endian: str = "<"
     ) -> None:
         self.dbpath = dbpath
+        self.endian = endian
         self.open(name, mode)
         pass
 
@@ -171,9 +173,10 @@ class table(object):
             self.header = json.load(header_file)
             pass
 
-        self.record_size = sum([h['size'] for h in self.header['data']])
-        self.format = ''.join([h['format'] for h in self.header['data']])
-        self.stat = pdata.stat()
+        format_list = [dat['format'] for dat in self.header['data']]
+        self.format = self.endian + ''.join(format_list)
+        self.record_size = struct.calcsize(self.format)
+        self.stat = data_path.stat()
         self.nrecords = self.stat.st_size // self.record_size
         return
 
@@ -269,17 +272,33 @@ class table(object):
             cols = [_col for _col in self.header['data'] if _col['key'] in cols]
             pass
 
+        def DataFormatError(e: str = ""):
+            return ValueError(
+                e + "\nThis may caused by wrong specification of data format."
+                "Try ``db.open_table(table_name).recovered.read()`` instead of"
+                "``db.open_table(table_name).read()``."
+            )
+
         if astype in ['tuple']:
             return self._astype_tuple(data, cols)
 
         elif astype in ['dict']:
-            return self._astype_dict(data, cols)
+            try:
+                return self._astype_dict(data, cols)
+            except struct.error as e:
+                raise DataFormatError(e)
 
         elif astype in ['structuredarray', 'structured_array', 'array', 'sa']:
-            return self._astype_structured_array(data, cols)
+            try:
+                return self._astype_structured_array(data, cols)
+            except ValueError as e:
+                raise DataFormatError(e)
 
-        elif astype in ['dataframe', 'data_frame', 'pandas']:
-            return self._astype_data_frame(data, cols)
+        elif astype in ['dataframe', 'data_frame', 'pandas', 'df']:
+            try:
+                return self._astype_data_frame(data, cols)
+            except struct.error as e:
+                raise DataFormatError(e)
 
         elif astype in ['buffer', 'raw']:
             return data
@@ -299,17 +318,15 @@ class table(object):
         """Read the data as list of dict."""
         offset = 0
         dictlist = []
-        while count < len(data):
-            dict_ = {}
+        while offset < len(data):
+            fmt = self.endian + ''.join([col['format'] for col in cols])
+            keys = [col['key'] for col in cols]
+            dict_ = {
+                k: v for k, v in zip(keys, struct.unpack_from(fmt, data, offset))
+            }
 
-            for c in cols:
-                d = struct.unpack(c['format'], data[count:count+c['size']])
-                if len(d) == 1:
-                    d = d[0]
-                    pass
-                dict_[c['key']] = d
-                count += c['size']
-                continue
+            size = struct.calcsize(fmt)
+            offset += size
 
             dictlist.append(dict_)
             continue
@@ -328,24 +345,38 @@ class table(object):
     ) -> numpy.ndarray:
         """Read the data as numpy's structured array."""
         def struct2arrayprotocol(fmt):
-            fmt = fmt.replace('c', 'S')
-            fmt = fmt.replace('h', 'i2')
-            fmt = fmt.replace('H', 'u2')
-            fmt = fmt.replace('i', 'i4')
-            fmt = fmt.replace('I', 'u4')
-            fmt = fmt.replace('l', 'i4')
-            fmt = fmt.replace('L', 'u4')
-            fmt = fmt.replace('q', 'i8')
-            fmt = fmt.replace('Q', 'u8')
-            fmt = fmt.replace('f', 'f4')
-            fmt = fmt.replace('d', 'f8')
-            fmt = fmt.replace('s', 'S')
-            return fmt
+            fmt = fmt.replace("s", "a")  # numpy type strings for bytes are ["S", "a"]
+            return numpy.dtype(fmt).newbyteorder(self.endian).str
 
-        keys = [c['key'] for c in cols]
-        fmt = [struct2arrayprotocol(c['format']) for c in cols]
+        keys = [col['key'] for col in cols]
+        dtype = [struct2arrayprotocol(col['format']) for col in cols]
 
-        return numpy.frombuffer(data, [(k, f) for k, f in zip(keys, fmt)])
+        return numpy.frombuffer(data, [(k, f) for k, f in zip(keys, dtype)])
+
+    @property
+    def recovered(self) -> "table":
+        """Restore the broken data caused by bugs in logger.
+
+        Examples
+        --------
+        >>> db = necstdb.opendb("path/to/db")
+        >>> data = db.open_table("topic_name").recovered.read(astype="array")
+        array([...])
+
+        Notes
+        -----
+        The details of the bugs are:
+        - bool data are dumped as bool, but the formatting character in the header was
+          int32's
+        When other bug is found, this property should determine what the problem is,
+        based on the value of the data (e.g. timestamp contains extremely small number
+        such as 1e-308)
+        """
+        self.endian = ""
+        for dat in self.header["data"]:
+            dat["format"] = dat["format"].replace("i", "?")
+        return self
+
 
 def opendb(path: os.PathLike, mode: str = 'r') -> "necstdb":
     """Quick alias to open a database.
