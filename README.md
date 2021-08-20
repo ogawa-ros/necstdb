@@ -53,6 +53,10 @@ pip install necstdb
     ... }
     ```
 
+    The keys "key", "format" and "size" in "data" list are required. For the format character and the size, see the [documentation](https://docs.python.org/3/library/struct.html#format-characters).
+
+    The "memo" and "necstdb_version" keys are not necessary. You can also add any other keys to the data information dict.
+
 3. Create and write individual table of data
 
     ```python
