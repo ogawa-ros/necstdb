@@ -117,7 +117,7 @@ weather_data        6328                113         56                  ddddddd
 ```python
 >>> db = necstdb.opendb("path/to/database_directory")
 >>> data = db.open_table("data1").read(num=5, start=3, cols=["timestamp", "obsmode"], astype="tuple")  # order of cols won't be preserved
-((b'SKY', 1.6294488788e9)
+((b'SKY', 1.6294488788e9)  # 3rd element (caution 0-based indexing)
  (b'SKY', 1.6294488798e9)
  (b'SKY', 1.6294488808e9)
  (b'SKY', 1.6294488818e9)
