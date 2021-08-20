@@ -41,15 +41,12 @@ class necstdb(object):
             path = pathlib.Path(path)
             pass
         
-        if path.exists() == True:
-            pass
-
-        else:
+        if not path.exists():
             if mode == 'w':
                 path.mkdir(parents=True)
 
             elif mode == 'r':
-                raise Exception ('this directory not exist!!')
+                raise Exception("This directory doesn't exist!!")
         return
 
     def list_tables(self) -> List[str]:
@@ -61,11 +58,11 @@ class necstdb(object):
         if name in self.list_tables():
             return
 
-        pdata = self.path / (name + '.data')
-        pheader = self.path / (name + '.header')
+        data_path = self.path / (name + '.data')
+        header_path = self.path / (name + '.header')
 
-        pdata.touch()
-        with pheader.open('w') as f:
+        data_path.touch()
+        with header_path.open('w') as f:
             json.dump(config, f)
             pass
         return
@@ -102,9 +99,9 @@ class necstdb(object):
             table = self.open_table(name)
             dic = {
                 'table name': name,
-                'file size': table.stat.st_size,
+                'file size [byte]': table.stat.st_size,
                 '#records': table.nrecords,
-                'record size': table.record_size,
+                'record size [byte]': table.record_size,
                 'format': table.format,
             }
             dictlist.append(dic)
@@ -113,11 +110,13 @@ class necstdb(object):
 
         df = pandas.DataFrame(
             dictlist,
-            columns = ['table name',
-                       'file size',
-                       '#records',
-                       'record size',
-                       'format']
+            columns = [
+                'table name',
+                'file size',
+                '#records',
+                'record size',
+                'format'
+            ]
         ).set_index('table name')
 
         return df
@@ -145,7 +144,7 @@ class table(object):
     """
 
     dbpath = ''
-    fdata = None
+    data_file = None
     header = {}
     record_size = 0
     format = ''
@@ -164,12 +163,12 @@ class table(object):
         data_path = self.dbpath / (table_name + '.data')
         header_path = self.dbpath / (table_name + '.header')
 
-        if not(pdata.exists() and pheader.exists()):
-            raise(Exception("table '{name}' does not exist".format(**locals())))
+        if not (data_path.exists() and header_path.exists()):
+            raise Exception("table '{table_name}' does not exist".format(**locals()))
 
-        self.fdata = pdata.open(mode)
-        with pheader.open('r') as fheader:
-            self.header = json.load(fheader)
+        self.data_file = data_path.open(mode)
+        with header_path.open('r') as header_file:
+            self.header = json.load(header_file)
             pass
 
         self.record_size = sum([h['size'] for h in self.header['data']])
@@ -214,12 +213,14 @@ class table(object):
         mm.seek(start * self.record_size)
 
         if cols == []:
-            d = self._read_all_cols(mm, num)
+            data = self._read_all_cols(mm, num)
         else:
-            d = self._read_specified_cols(mm, num, cols)
+            if isinstance(cols, str):
+                raise ValueError("Column names should be given as list of str.")
+            data = self._read_specified_cols(mm, num, cols)
             pass
 
-        return self._astype(d, cols, astype)
+        return self._astype(data, cols, astype)
 
     def _read_all_cols(self, mm: mmap.mmap, num: int) -> bytes:
         """Read all columns of the data table."""
@@ -265,7 +266,7 @@ class table(object):
         if cols == []:
             cols = self.header['data']
         else:
-            cols = [c for c in self.header['data'] if c['key'] in cols]
+            cols = [_col for _col in self.header['data'] if _col['key'] in cols]
             pass
 
         if astype in ['tuple']:
