@@ -19,7 +19,7 @@ import tarfile
 import numpy
 import pandas
 
-from .utils import utils
+from . import utils
 
 
 class necstdb(object):
@@ -67,7 +67,11 @@ class necstdb(object):
 
         format_list = [dat["format"] for dat in config["data"]]
         format_str = self.endian + "".join(format_list)
-        config["struct_indices"] = utils.get_struct_indices(format_str)
+
+        # Validate sizes
+        for dat, size in zip(config["data"], utils.get_struct_sizes(format_str)):
+            dat["size"] = size
+        config["struct_indices"] = True
 
         data_path = self.path / (name + ".data")
         header_path = self.path / (name + ".header")
@@ -195,8 +199,12 @@ class table(object):
         self.stat = data_path.stat()
         self.nrecords = self.stat.st_size // self.record_size
 
-        if not self.header.get("struct_indices", None):
-            self.header["struct_indices"] = utils.get_struct_indices(self.format)
+        if self.header.get("struct_indices", False) is False:
+            # Infer sizes
+            struct_sizes = utils.get_struct_sizes(self.format)
+            for dat, size in zip(self.header["data"], struct_sizes):
+                dat["size"] = size
+            self.header["struct_indices"] = True
         return
 
     def close(self) -> None:
@@ -263,15 +271,16 @@ class table(object):
         One resolution for this problem would be to read all columns, then drop
         unnecessary columns.
         """
-        indices = self.header["struct_indices"]
+        # indices = self.header["struct_indices"]
         commands = []
-        for i, _col in enumerate(self.header["data"]):
-            separation = indices[i + 1] - indices[i]
+        for _col in self.header["data"]:
+            # separation = indices[i + 1] - indices[i]
+            elemsize = struct.calcsize(_col["format"])
             if _col["key"] in cols:
-                commands.append({"cmd": "read", "size": _col["size"]})
-                commands.append({"cmd": "seek", "size": separation - _col["size"]})
+                commands.append({"cmd": "read", "size": elemsize})
+                commands.append({"cmd": "seek", "size": _col["size"] - elemsize})
             else:
-                commands.append({"cmd": "seek", "size": separation})
+                commands.append({"cmd": "seek", "size": _col["size"]})
 
         if num == -1:
             num = (mm.size() - mm.tell()) // self.record_size
@@ -306,7 +315,10 @@ class table(object):
             )
 
         if astype in ["tuple"]:
-            return self._astype_tuple(data, cols)
+            try:
+                return self._astype_tuple(data, cols)
+            except struct.error as e:
+                raise DataFormatError(e)
 
         elif astype in ["dict"]:
             try:
@@ -375,14 +387,19 @@ class table(object):
     ) -> numpy.ndarray:
         """Read the data as numpy's structured array."""
 
-        def struct2arrayprotocol(fmt):
-            fmt = fmt.replace("s", "a")  # numpy type strings for bytes are ["S", "a"]
-            return fmt
+        # def struct2arrayprotocol(fmt):
+        #     fmt = fmt.replace("s", "a")  # numpy type strings for bytes are ["S", "a"]
+        #     return fmt
 
         keys = [col["key"] for col in cols]
-        dtype = [struct2arrayprotocol(col["format"]) for col in cols]
+        formats = [self.endian + col["format"].replace("s", "a") for col in cols]
+        format_str = self.endian + "".join([col["format"] for col in cols])
+        offsets = utils.get_struct_indices(format_str)[:-1]
+        # dt = [struct2arrayprotocol(col["format"]) for col in cols]
+        dtype = numpy.dtype({"names": keys, "formats": formats, "offsets": offsets})
 
-        return numpy.frombuffer(data, [(k, f) for k, f in zip(keys, dtype)])
+        # return numpy.frombuffer(data, [(k, f) for k, f in zip(keys, dt)])
+        return numpy.frombuffer(data, dtype=dtype)
 
     @property
     def recovered(self) -> "table":
