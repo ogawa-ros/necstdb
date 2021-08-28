@@ -19,6 +19,8 @@ import tarfile
 import numpy
 import pandas
 
+from . import utils
+
 
 class necstdb(object):
     """Database for NECST.
@@ -40,43 +42,55 @@ class necstdb(object):
         if not isinstance(path, pathlib.Path):
             path = pathlib.Path(path)
             pass
-        
-        if path.exists() == True:
-            pass
 
-        else:
-            if mode == 'w':
+        self.path = path
+
+        if not path.exists():
+            if mode == "w":
                 path.mkdir(parents=True)
 
-            elif mode == 'r':
-                raise Exception ('this directory not exist!!')
+            elif mode == "r":
+                raise Exception("This directory doesn't exist!!")
         return
 
     def list_tables(self) -> List[str]:
         """List all tables within the database."""
-        return sorted([table.stem for table in self.path.glob('*.data')])
+        return sorted([table.stem for table in self.path.glob("*.data")])
 
-    def create_table(self, name: str, config: Dict[str, Any]) -> None:
+    def create_table(
+        self, name: str, config: Dict[str, Any], endian: str = "<"
+    ) -> None:
         """Create a pair of data and header files, then write header content."""
         if name in self.list_tables():
             return
+        self.endian = endian
 
-        pdata = self.path / (name + '.data')
-        pheader = self.path / (name + '.header')
+        format_list = [dat["format"] for dat in config["data"]]
+        format_str = self.endian + "".join(format_list)
 
-        pdata.touch()
-        with pheader.open('w') as f:
+        # Validate sizes
+        for dat, size in zip(config["data"], utils.get_struct_sizes(format_str)):
+            dat["size"] = size
+        config["struct_indices"] = True
+
+        data_path = self.path / (name + ".data")
+        header_path = self.path / (name + ".header")
+
+        data_path.touch()
+        with header_path.open("w") as f:
             json.dump(config, f)
             pass
         return
 
-    def open_table(self, name: str, mode: str = 'rb', endian: str = "<") -> "table":
+    def open_table(self, name: str, mode: str = "rb") -> "table":
         """Topic-wise data table."""
-        return table(self.path, name, mode, endian)
+        if getattr(self, "endian", None) is not None:
+            return table(self.path, name, mode, self.endian)
+        return table(self.path, name, mode)
 
     def checkout(self, saveto: os.PathLike, compression: str = None) -> None:
         """Archive the database.
-        
+
         Parameters
         ----------
         saveto: PathLike
@@ -84,7 +98,7 @@ class necstdb(object):
         compression: str
             Compression format/program to be used. One of ["gz", "bz2", "xz"].
         """
-        mode = 'w:'
+        mode = "w:"
         if compression is not None:
             mode += compression
             pass
@@ -101,11 +115,11 @@ class necstdb(object):
         for name in names:
             table = self.open_table(name)
             dic = {
-                'table name': name,
-                'file size': table.stat.st_size,
-                '#records': table.nrecords,
-                'record size': table.record_size,
-                'format': table.format,
+                "table name": name,
+                "file size [byte]": table.stat.st_size,
+                "#records": table.nrecords,
+                "record size [byte]": table.record_size,
+                "format": table.format,
             }
             dictlist.append(dic)
             table.close()
@@ -113,12 +127,14 @@ class necstdb(object):
 
         df = pandas.DataFrame(
             dictlist,
-            columns = ['table name',
-                       'file size',
-                       '#records',
-                       'record size',
-                       'format']
-        ).set_index('table name')
+            columns=[
+                "table name",
+                "file size [byte]",
+                "#records",
+                "record size [byte]",
+                "format",
+            ],
+        ).set_index("table name")
 
         return df
 
@@ -144,38 +160,51 @@ class table(object):
     vary between architectures this program runs on.
     """
 
-    dbpath = ''
-    fdata = None
+    dbpath = ""
+    data_file = None
     header = {}
     record_size = 0
-    format = ''
+    format = ""
     stat = None
     nrecords = 0
+    endian = ""
 
     def __init__(
         self, dbpath: pathlib.Path, name: str, mode: str, endian: str = "<"
     ) -> None:
         self.dbpath = dbpath
+        self.endian = endian
         self.open(name, mode)
+
+        self._name = name
+        self._mode = mode
         pass
 
     def open(self, table_name: str, mode: str) -> None:
         """Open a data table of specified topic."""
-        data_path = self.dbpath / (table_name + '.data')
-        header_path = self.dbpath / (table_name + '.header')
+        data_path = self.dbpath / (table_name + ".data")
+        header_path = self.dbpath / (table_name + ".header")
 
-        if not(pdata.exists() and pheader.exists()):
-            raise(Exception("table '{name}' does not exist".format(**locals())))
+        if not (data_path.exists() and header_path.exists()):
+            raise Exception("table '{table_name}' does not exist".format(**locals()))
 
-        self.fdata = pdata.open(mode)
-        with pheader.open('r') as fheader:
-            self.header = json.load(fheader)
+        self.data_file = data_path.open(mode)
+        with header_path.open("r") as header_file:
+            self.header = json.load(header_file)
             pass
 
-        self.record_size = sum([h['size'] for h in self.header['data']])
-        self.format = ''.join([h['format'] for h in self.header['data']])
-        self.stat = pdata.stat()
+        format_list = [dat["format"] for dat in self.header["data"]]
+        self.format = self.endian + "".join(format_list)
+        self.record_size = struct.calcsize(self.format)
+        self.stat = data_path.stat()
         self.nrecords = self.stat.st_size // self.record_size
+
+        if self.header.get("struct_indices", False) is False:
+            # Infer sizes
+            struct_sizes = utils.get_struct_sizes(self.format)
+            for dat, size in zip(self.header["data"], struct_sizes):
+                dat["size"] = size
+            self.header["struct_indices"] = True
         return
 
     def close(self) -> None:
@@ -189,11 +218,7 @@ class table(object):
         return
 
     def read(
-        self,
-        num: int = -1,
-        start: int = 0,
-        cols: List[str] = [],
-        astype: str = 'tuple'
+        self, num: int = -1, start: int = 0, cols: List[str] = [], astype: str = "tuple"
     ) -> Union[tuple, dict, numpy.ndarray, pandas.DataFrame, bytes]:
         """Read the contents of the table.
 
@@ -214,12 +239,15 @@ class table(object):
         mm.seek(start * self.record_size)
 
         if cols == []:
-            d = self._read_all_cols(mm, num)
+            data = self._read_all_cols(mm, num)
         else:
-            d = self._read_specified_cols(mm, num, cols)
+            if isinstance(cols, str):
+                raise ValueError("Column names should be given as list of str.")
+            data = self._read_specified_cols(mm, num, cols)
             pass
 
-        return self._astype(d, cols, astype)
+        mm.close()
+        return self._astype(data, cols, astype)
 
     def _read_all_cols(self, mm: mmap.mmap, num: int) -> bytes:
         """Read all columns of the data table."""
@@ -233,26 +261,37 @@ class table(object):
     def _read_specified_cols(
         self, mm: mmap.mmap, num: int, cols: List[Dict[str, str]]
     ) -> bytes:
-        """Read specified columns of the data table."""
+        """Read specified columns of the data table.
+
+        Notes
+        -----
+        The byte count of this function may contain bugs. For data which are not
+        aligned, the count would be correct, but byte count for aligned data is much
+        difficult, hence the implementation may not perfect.
+        One resolution for this problem would be to read all columns, then drop
+        unnecessary columns.
+        """
+        # indices = self.header["struct_indices"]
         commands = []
-        for _col in self.header['data']:
-            if _col['key'] in cols:
-                commands.append({'cmd': 'read', 'size': _col['size']})
+        for _col in self.header["data"]:
+            # separation = indices[i + 1] - indices[i]
+            elemsize = struct.calcsize(_col["format"])
+            if _col["key"] in cols:
+                commands.append({"cmd": "read", "size": elemsize})
+                commands.append({"cmd": "seek", "size": _col["size"] - elemsize})
             else:
-                commands.append({'cmd': 'seek', 'size': _col['size']})
-                pass
-            continue
+                commands.append({"cmd": "seek", "size": _col["size"]})
 
         if num == -1:
             num = (mm.size() - mm.tell()) // self.record_size
 
-        draw = b''
+        draw = b""
         for i in range(num):
             for _cmd in commands:
-                if _cmd['cmd'] == 'seek':
-                    mm.seek(_cmd['size'], os.SEEK_CUR)
+                if _cmd["cmd"] == "seek":
+                    mm.seek(_cmd["size"], os.SEEK_CUR)
                 else:
-                    draw += mm.read(_cmd['size'])
+                    draw += mm.read(_cmd["size"])
                     pass
                 continue
             continue
@@ -263,24 +302,43 @@ class table(object):
     ) -> Union[tuple, dict, numpy.ndarray, pandas.DataFrame, bytes]:
         """Map the astype argument to corresponding methods."""
         if cols == []:
-            cols = self.header['data']
+            cols = self.header["data"]
         else:
-            cols = [c for c in self.header['data'] if c['key'] in cols]
+            cols = [_col for _col in self.header["data"] if _col["key"] in cols]
             pass
 
-        if astype in ['tuple']:
-            return self._astype_tuple(data, cols)
+        def DataFormatError(e: Union[Exception, str] = ""):
+            return ValueError(
+                str(e) + "\nThis may caused by wrong specification of data format."
+                "Try ``db.open_table(table_name).recovered.read()`` instead of"
+                "``db.open_table(table_name).read()``."
+            )
 
-        elif astype in ['dict']:
-            return self._astype_dict(data, cols)
+        if astype in ["tuple"]:
+            try:
+                return self._astype_tuple(data, cols)
+            except struct.error as e:
+                raise DataFormatError(e)
 
-        elif astype in ['structuredarray', 'structured_array', 'array', 'sa']:
-            return self._astype_structured_array(data, cols)
+        elif astype in ["dict"]:
+            try:
+                return self._astype_dict(data, cols)
+            except struct.error as e:
+                raise DataFormatError(e)
 
-        elif astype in ['dataframe', 'data_frame', 'pandas']:
-            return self._astype_data_frame(data, cols)
+        elif astype in ["structuredarray", "structured_array", "array", "sa"]:
+            try:
+                return self._astype_structured_array(data, cols)
+            except ValueError as e:
+                raise DataFormatError(e)
 
-        elif astype in ['buffer', 'raw']:
+        elif astype in ["dataframe", "data_frame", "pandas", "df"]:
+            try:
+                return self._astype_data_frame(data, cols)
+            except struct.error as e:
+                raise DataFormatError(e)
+
+        elif astype in ["buffer", "raw"]:
             return data
 
         return
@@ -289,7 +347,7 @@ class table(object):
         self, data: bytes, cols: List[Dict[str, Any]]
     ) -> Tuple[Tuple[Any]]:
         """Read the data as tuple of tuple."""
-        fmt = self.endian + ''.join([col['format'] for col in cols])
+        fmt = self.endian + "".join([col["format"] for col in cols])
         return tuple(struct.iter_unpack(fmt, data))
 
     def _astype_dict(
@@ -298,16 +356,18 @@ class table(object):
         """Read the data as list of dict."""
         offset = 0
         dictlist = []
-        while count < len(data):
+        while offset < len(data):
             dict_ = {}
 
-            for c in cols:
-                d = struct.unpack(c['format'], data[count:count+c['size']])
-                if len(d) == 1:
-                    d = d[0]
+            for col in cols:
+                size = struct.calcsize(col["format"])
+                # print(col["format"], data[offset : offset + col["size"]])  ##
+                dat = struct.unpack(col["format"], data[offset : offset + size])
+                if len(dat) == 1:
+                    dat = dat[0]
                     pass
-                dict_[c['key']] = d
-                count += c['size']
+                dict_[col["key"]] = dat
+                offset += col["size"]
                 continue
 
             dictlist.append(dict_)
@@ -326,27 +386,48 @@ class table(object):
         self, data: bytes, cols: List[Dict[str, Any]]
     ) -> numpy.ndarray:
         """Read the data as numpy's structured array."""
-        def struct2arrayprotocol(fmt):
-            fmt = fmt.replace('c', 'S')
-            fmt = fmt.replace('h', 'i2')
-            fmt = fmt.replace('H', 'u2')
-            fmt = fmt.replace('i', 'i4')
-            fmt = fmt.replace('I', 'u4')
-            fmt = fmt.replace('l', 'i4')
-            fmt = fmt.replace('L', 'u4')
-            fmt = fmt.replace('q', 'i8')
-            fmt = fmt.replace('Q', 'u8')
-            fmt = fmt.replace('f', 'f4')
-            fmt = fmt.replace('d', 'f8')
-            fmt = fmt.replace('s', 'S')
-            return fmt
 
-        keys = [c['key'] for c in cols]
-        fmt = [struct2arrayprotocol(c['format']) for c in cols]
+        # def struct2arrayprotocol(fmt):
+        #     fmt = fmt.replace("s", "a")  # numpy type strings for bytes are ["S", "a"]
+        #     return fmt
 
-        return numpy.frombuffer(data, [(k, f) for k, f in zip(keys, fmt)])
+        keys = [col["key"] for col in cols]
+        formats = [self.endian + col["format"].replace("s", "a") for col in cols]
+        format_str = self.endian + "".join([col["format"] for col in cols])
+        offsets = utils.get_struct_indices(format_str)[:-1]
+        # dt = [struct2arrayprotocol(col["format"]) for col in cols]
+        dtype = numpy.dtype({"names": keys, "formats": formats, "offsets": offsets})
 
-def opendb(path: os.PathLike, mode: str = 'r') -> "necstdb":
+        # return numpy.frombuffer(data, [(k, f) for k, f in zip(keys, dt)])
+        return numpy.frombuffer(data, dtype=dtype)
+
+    @property
+    def recovered(self) -> "table":
+        """Restore the broken data caused by bugs in logger.
+
+        Examples
+        --------
+        >>> db = necstdb.opendb("path/to/db")
+        >>> data = db.open_table("topic_name").recovered.read(astype="array")
+        array([...])
+
+        Notes
+        -----
+        The details of the bugs are:
+        - bool data are dumped as bool, but the formatting character in the header was
+          int32's
+        When other bug is found, this property should determine what the problem is,
+        based on the value of the data (e.g. timestamp contains extremely small number
+        such as 1e-308)
+        """
+        self.endian = ""
+        self.open(self._name, self._mode)
+        for dat in self.header["data"]:
+            dat["format"] = dat["format"].replace("i", "?")
+        return self
+
+
+def opendb(path: os.PathLike, mode: str = "r") -> "necstdb":
     """Quick alias to open a database.
 
     Parameters
