@@ -19,6 +19,8 @@ import tarfile
 import numpy
 import pandas
 
+from .utils import utils
+
 
 class necstdb(object):
     """Database for NECST.
@@ -41,6 +43,8 @@ class necstdb(object):
             path = pathlib.Path(path)
             pass
 
+        self.path = path
+
         if not path.exists():
             if mode == "w":
                 path.mkdir(parents=True)
@@ -53,10 +57,17 @@ class necstdb(object):
         """List all tables within the database."""
         return sorted([table.stem for table in self.path.glob("*.data")])
 
-    def create_table(self, name: str, config: Dict[str, Any]) -> None:
+    def create_table(
+        self, name: str, config: Dict[str, Any], endian: str = "<"
+    ) -> None:
         """Create a pair of data and header files, then write header content."""
         if name in self.list_tables():
             return
+        self.endian = endian
+
+        format_list = [dat["format"] for dat in config["data"]]
+        format_str = self.endian + "".join(format_list)
+        config["struct_indices"] = utils.get_struct_indices(format_str)
 
         data_path = self.path / (name + ".data")
         header_path = self.path / (name + ".header")
@@ -67,9 +78,11 @@ class necstdb(object):
             pass
         return
 
-    def open_table(self, name: str, mode: str = "rb", endian: str = "<") -> "table":
+    def open_table(self, name: str, mode: str = "rb") -> "table":
         """Topic-wise data table."""
-        return table(self.path, name, mode, endian)
+        if getattr(self, "endian", None) is not None:
+            return table(self.path, name, mode, self.endian)
+        return table(self.path, name, mode)
 
     def checkout(self, saveto: os.PathLike, compression: str = None) -> None:
         """Archive the database.
@@ -110,7 +123,13 @@ class necstdb(object):
 
         df = pandas.DataFrame(
             dictlist,
-            columns=["table name", "file size", "#records", "record size", "format"],
+            columns=[
+                "table name",
+                "file size [byte]",
+                "#records",
+                "record size [byte]",
+                "format",
+            ],
         ).set_index("table name")
 
         return df
@@ -152,6 +171,9 @@ class table(object):
         self.dbpath = dbpath
         self.endian = endian
         self.open(name, mode)
+
+        self._name = name
+        self._mode = mode
         pass
 
     def open(self, table_name: str, mode: str) -> None:
@@ -172,6 +194,9 @@ class table(object):
         self.record_size = struct.calcsize(self.format)
         self.stat = data_path.stat()
         self.nrecords = self.stat.st_size // self.record_size
+
+        if not self.header.get("struct_indices", None):
+            self.header["struct_indices"] = utils.get_struct_indices(self.format)
         return
 
     def close(self) -> None:
@@ -213,6 +238,7 @@ class table(object):
             data = self._read_specified_cols(mm, num, cols)
             pass
 
+        mm.close()
         return self._astype(data, cols, astype)
 
     def _read_all_cols(self, mm: mmap.mmap, num: int) -> bytes:
@@ -227,15 +253,25 @@ class table(object):
     def _read_specified_cols(
         self, mm: mmap.mmap, num: int, cols: List[Dict[str, str]]
     ) -> bytes:
-        """Read specified columns of the data table."""
+        """Read specified columns of the data table.
+
+        Notes
+        -----
+        The byte count of this function may contain bugs. For data which are not
+        aligned, the count would be correct, but byte count for aligned data is much
+        difficult, hence the implementation may not perfect.
+        One resolution for this problem would be to read all columns, then drop
+        unnecessary columns.
+        """
+        indices = self.header["struct_indices"]
         commands = []
-        for _col in self.header["data"]:
+        for i, _col in enumerate(self.header["data"]):
+            separation = indices[i + 1] - indices[i]
             if _col["key"] in cols:
                 commands.append({"cmd": "read", "size": _col["size"]})
+                commands.append({"cmd": "seek", "size": separation - _col["size"]})
             else:
-                commands.append({"cmd": "seek", "size": _col["size"]})
-                pass
-            continue
+                commands.append({"cmd": "seek", "size": separation})
 
         if num == -1:
             num = (mm.size() - mm.tell()) // self.record_size
@@ -262,9 +298,9 @@ class table(object):
             cols = [_col for _col in self.header["data"] if _col["key"] in cols]
             pass
 
-        def DataFormatError(e: str = ""):
+        def DataFormatError(e: Union[Exception, str] = ""):
             return ValueError(
-                e + "\nThis may caused by wrong specification of data format."
+                str(e) + "\nThis may caused by wrong specification of data format."
                 "Try ``db.open_table(table_name).recovered.read()`` instead of"
                 "``db.open_table(table_name).read()``."
             )
@@ -309,12 +345,18 @@ class table(object):
         offset = 0
         dictlist = []
         while offset < len(data):
-            fmt = self.endian + "".join([col["format"] for col in cols])
-            keys = [col["key"] for col in cols]
-            dict_ = {k: v for k, v in zip(keys, struct.unpack_from(fmt, data, offset))}
+            dict_ = {}
 
-            size = struct.calcsize(fmt)
-            offset += size
+            for col in cols:
+                size = struct.calcsize(col["format"])
+                # print(col["format"], data[offset : offset + col["size"]])  ##
+                dat = struct.unpack(col["format"], data[offset : offset + size])
+                if len(dat) == 1:
+                    dat = dat[0]
+                    pass
+                dict_[col["key"]] = dat
+                offset += col["size"]
+                continue
 
             dictlist.append(dict_)
             continue
@@ -335,7 +377,7 @@ class table(object):
 
         def struct2arrayprotocol(fmt):
             fmt = fmt.replace("s", "a")  # numpy type strings for bytes are ["S", "a"]
-            return numpy.dtype(fmt).newbyteorder(self.endian).str
+            return fmt
 
         keys = [col["key"] for col in cols]
         dtype = [struct2arrayprotocol(col["format"]) for col in cols]
@@ -362,6 +404,7 @@ class table(object):
         such as 1e-308)
         """
         self.endian = ""
+        self.open(self._name, self._mode)
         for dat in self.header["data"]:
             dat["format"] = dat["format"].replace("i", "?")
         return self
