@@ -66,10 +66,10 @@ class necstdb(object):
         self.endian = endian
 
         format_list = [dat["format"] for dat in config["data"]]
-        format_str = self.endian + "".join(format_list)
 
         # Validate sizes
-        for dat, size in zip(config["data"], utils.get_struct_sizes(format_str)):
+        struct_sizes = utils.get_struct_sizes(format_list, endian)
+        for dat, size in zip(config["data"], struct_sizes):
             dat["size"] = size
         config["struct_indices"] = True
 
@@ -201,7 +201,7 @@ class table(object):
 
         if self.header.get("struct_indices", False) is False:
             # Infer sizes
-            struct_sizes = utils.get_struct_sizes(self.format)
+            struct_sizes = utils.get_struct_sizes(format_list, self.endian)
             for dat, size in zip(self.header["data"], struct_sizes):
                 dat["size"] = size
             self.header["struct_indices"] = True
@@ -271,10 +271,8 @@ class table(object):
         One resolution for this problem would be to read all columns, then drop
         unnecessary columns.
         """
-        # indices = self.header["struct_indices"]
         commands = []
         for _col in self.header["data"]:
-            # separation = indices[i + 1] - indices[i]
             elemsize = struct.calcsize(_col["format"])
             if _col["key"] in cols:
                 commands.append({"cmd": "read", "size": elemsize})
@@ -361,7 +359,6 @@ class table(object):
 
             for col in cols:
                 size = struct.calcsize(col["format"])
-                # print(col["format"], data[offset : offset + col["size"]])  ##
                 dat = struct.unpack(col["format"], data[offset : offset + size])
                 if len(dat) == 1:
                     dat = dat[0]
@@ -386,19 +383,13 @@ class table(object):
         self, data: bytes, cols: List[Dict[str, Any]]
     ) -> numpy.ndarray:
         """Read the data as numpy's structured array."""
+        formats = [col["format"] for col in cols]
 
-        # def struct2arrayprotocol(fmt):
-        #     fmt = fmt.replace("s", "a")  # numpy type strings for bytes are ["S", "a"]
-        #     return fmt
-
+        # numpy type strings for bytes are ["S", "a"]
+        np_formats = [self.endian + col["format"].replace("s", "a") for col in cols]
         keys = [col["key"] for col in cols]
-        formats = [self.endian + col["format"].replace("s", "a") for col in cols]
-        format_str = self.endian + "".join([col["format"] for col in cols])
-        offsets = utils.get_struct_indices(format_str)[:-1]
-        # dt = [struct2arrayprotocol(col["format"]) for col in cols]
-        dtype = numpy.dtype({"names": keys, "formats": formats, "offsets": offsets})
-
-        # return numpy.frombuffer(data, [(k, f) for k, f in zip(keys, dt)])
+        offsets = utils.get_struct_indices(formats, self.endian)[:-1]
+        dtype = numpy.dtype({"names": keys, "formats": np_formats, "offsets": offsets})
         return numpy.frombuffer(data, dtype=dtype)
 
     @property
