@@ -59,7 +59,7 @@ pip install necstdb
 
     The "memo" and "necstdb_version" keys are not necessary. You can also add any other keys to the data information dict.
 
-    | ROS format | format character | size \[byte\] |
+    | ROS format | Format character | Size \[byte\] |
     | ---------- | ---------------- | ------------- |
     | bool       | ``?``            | 1             |
     | int8       | ``b``            | 1             |
@@ -122,7 +122,7 @@ pip install necstdb
 
     The supported ``astype`` keywords for ``read`` method are:
 
-    | output type      | keywords                                             | notes |
+    | Output type      | Keywords                                             | Notes |
     | ---------------- | ---------------------------------------------------- | ----- |
     | tuple            | "tuple"                                              | \*1   |
     | dict             | "dict"                                               |       |
