@@ -130,8 +130,8 @@ pip install necstdb
     | numpy.ndarray    | "array", "structuredarray", "structured_array", "sa" |       |
     | bytes            | "buffer", "raw"                                      |       |
 
-    ***\*1*** : Array data are not supported, but will be flattened.  
-    ***\*2*** *Changed in v0.2.5: Keyword ``df`` is supported.*
+    ***\*1***: Array data are not supported, but will be flattened.  
+    ***\*2***: *Changed in v0.2.5: Keyword ``df`` is now supported.*
 
 ### Misc
 
