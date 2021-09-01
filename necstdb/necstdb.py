@@ -30,7 +30,7 @@ class necstdb(object):
     path: PathLike
         Path to the database directory, the direct parent of *.data and *.header files.
     mode: str
-        Mode in which the database is opened (e.g. ["rb", "wb", ...]).
+        Mode in which the database is opened, either "r" or "w".
     """
 
     def __init__(self, path: os.PathLike, mode: str) -> None:
@@ -46,10 +46,10 @@ class necstdb(object):
         self.path = path
 
         if not path.exists():
-            if mode == "w":
+            if mode.find("w") != -1:
                 path.mkdir(parents=True)
 
-            elif mode == "r":
+            elif mode.find("r") != -1:
                 raise Exception("This directory doesn't exist!!")
         return
 
