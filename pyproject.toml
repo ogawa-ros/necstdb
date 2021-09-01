@@ -4,6 +4,9 @@ version = "0.2.5"
 description = "Database for NECST."
 authors = ["Kaoru Nishikawa <k.nishikawa@a.phys.nagoya-u.ac.jp>"]
 license = "MIT"
+readme = "README.md"
+homepage = "https://github.com/ogawa-ros/necstdb"
+repository = "https://github.com/ogawa-ros/necstdb"
 
 [tool.poetry.dependencies]
 python = "^3.6.1"
