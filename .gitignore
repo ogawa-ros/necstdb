@@ -97,3 +97,7 @@ ENV/
 # ROS
 CMakefile.txt
 package.xml
+
+# editor
+.vscode/
+*.code-workspace
