@@ -104,6 +104,15 @@ pip install necstdb
     ***NOTE:***
     Multi-dimensional data are not supported.
 
+    ***NOTE:***
+    Shape of array or length of string in every data must be the same as the one in data information. (Mismatch of string length won't raise an error, but stored data can be broken or incomplete.)
+
+4. Save files into the database
+
+    ```python
+    >>> db.save_file("example.txt", "Content of the file.")
+    ```
+
 ### Database Reader
 
 1. Open the database instance
@@ -132,6 +141,22 @@ pip install necstdb
 
     ***\*1***: Array data are not supported, but will be flattened.  
     ***\*2***: *Changed in v0.2.5: Keyword ``df`` is now supported.*
+
+3. Read files saved in the database
+
+    ```python
+    >>> db.read_file("example.txt")
+    "Content of the file.", ""
+    ```
+
+    This method assumes the file can be read as `str`. This attempt will fail for binary files, so use `asbytes` option explicitly.
+
+    ```python
+    >>> db.read_file("example_binary.data", asbytes=True)
+    b"Content of the file.", b""
+    ```
+
+    This method returns 2 `str` or `bytes` values. The second value is metadata for the file saved using `db.save_file(filename, data, metadata)` method.
 
 ### Misc
 
