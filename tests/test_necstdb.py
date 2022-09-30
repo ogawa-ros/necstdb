@@ -9,6 +9,7 @@ import necstdb
 
 TIME = 1630042892.423945
 
+
 DATA1 = ([i, -16, -32, -64] for i in range(11))
 DATA1_HEADER = {
     "data": [
@@ -52,6 +53,12 @@ DATA4_HEADER = {
         {"key": "array", "format": "3d", "size": 24},
     ]
 }
+DATA5 = ([[b"abc", b"def", b"ghi"]] for _ in range(55))
+DATA5_HEADER = {
+    "data": [
+        {"key": "strArray", "format": "3s3s3s", "size": 9},
+    ]
+}
 
 # DTypes (int8, int16, ...) are not preserved.
 # Array data are not reconstructed.
@@ -59,12 +66,14 @@ EXPECTED_DATA1_TUPLE = (3, -16, -32, -64)
 EXPECTED_DATA2_TUPLE = (3, 16, 32, 64)
 EXPECTED_DATA3_TUPLE = (0.32, 3, b"byte", b"c")
 EXPECTED_DATA4_TUPLE = (True, b"str", 3, TIME, TIME)
+EXPECTED_DATA5_TUPLE = (b"abc", b"def", b"ghi")
 
 # DTypes (int8, int16, ...) are not preserved.
 EXPECTED_DATA1_DICT = {"int8": 3, "int16": -16, "int32": -32, "int64": -64}
 EXPECTED_DATA2_DICT = {"uint8": 3, "uint16": 16, "uint32": 32, "uint64": 64}
 EXPECTED_DATA3_DICT = {"float32": 0.32, "float64": 3, "_byte": b"byte", "_char": b"c"}
 EXPECTED_DATA4_DICT = {"bool": True, "string": b"str", "array": (3, TIME, TIME)}
+EXPECTED_DATA5_DICT = {"strArray": (b"abc", b"def", b"ghi")}
 
 # DTypes (int8, int16, ...) are not preserved.
 EXPECTED_DATA1_DF = pd.DataFrame(
@@ -79,6 +88,7 @@ EXPECTED_DATA3_DF = pd.DataFrame(
 EXPECTED_DATA4_DF = pd.DataFrame(
     [(True, b"str", [3, TIME, TIME])], columns=["bool", "string", "array"]
 )
+EXPECTED_DATA5_DF = pd.DataFrame([(["abc", "def", "ghi"],)], columns=["strArray"])
 
 EXPECTED_DATA1_ARRAY = np.array(
     [(3, -16, -32, -64)],
@@ -96,6 +106,10 @@ EXPECTED_DATA4_ARRAY = np.array(
     [(True, b"str", [3, TIME, TIME])],
     dtype=[("bool", "?"), ("string", "S3"), ("array", "3f8")],
 )
+EXPECTED_DATA5_ARRAY = np.array(
+    [(["abc", "def", "ghi"],)],
+    dtype=[("strArray", "3S3")],
+)
 
 EXPECTED_DATA1_BYTE = b"\x03\xf0\xff\xe0\xff\xff\xff\xc0\xff\xff\xff\xff\xff\xff\xff"
 EXPECTED_DATA2_BYTE = b"\x03\x10\x00 \x00\x00\x00@\x00\x00\x00\x00\x00\x00\x00"
@@ -104,6 +118,7 @@ EXPECTED_DATA4_BYTE = (
     b"\x01str"
     b"\x00\x00\x00\x00\x00\x00\x08@\xea!\x1b\xc3\x1eJ\xd8A\xea!\x1b\xc3\x1eJ\xd8A"
 )
+EXPECTED_DATA5_BYTE = b"abcdefghi"
 
 
 @pytest.fixture(scope="module")
@@ -120,17 +135,19 @@ class TestWriteDatabase:
         db.create_table("data2", DATA2_HEADER)
         db.create_table("data3", DATA3_HEADER)
         db.create_table("data4", DATA4_HEADER)
+        db.create_table("data5", DATA5_HEADER)
 
     def test_write_table(self, db_path):
         db = necstdb.opendb(db_path, mode="w")
         tables = {
             name: db.open_table(name, mode="ab")
-            for name in ["data1", "data2", "data3", "data4"]
+            for name in ["data1", "data2", "data3", "data4", "data5"]
         }
 
         _ = [tables["data1"].append(*data) for data in DATA1]
         _ = [tables["data2"].append(*data) for data in DATA2]
         _ = [tables["data3"].append(*data) for data in DATA3]
+
         for data in DATA4:
             flat_data = []
             _ = [
@@ -140,6 +157,15 @@ class TestWriteDatabase:
                 for dat in data
             ]  # Flatten the data.
             tables["data4"].append(*flat_data)
+        for data in DATA5:
+            flat_data = []
+            _ = [
+                flat_data.extend(dat)
+                if isinstance(dat, list)
+                else flat_data.append(dat)
+                for dat in data
+            ]  # Flatten the data.
+            tables["data5"].append(*flat_data)
 
         _ = [tab.close() for tab in tables.values()]
 
@@ -156,7 +182,7 @@ class TestWriteDatabase:
             db.save_file(*args)
 
 
-table_name = ["data1", "data2", "data3", "data4"]
+table_name = ["data1", "data2", "data3", "data4", "data5"]
 
 
 @pytest.mark.usefixtures("db_path")
@@ -185,6 +211,7 @@ class TestReadDatabase:
         with pytest.raises(TypeError):
             # Array data are not supported for tuple.
             assert len(actual["data4"][3][-1]) == 3
+        assert EXPECTED_DATA5_TUPLE == actual["data5"][3]
 
     def test_read_as_dict(self, db_path):
         db = necstdb.opendb(db_path)
@@ -196,6 +223,8 @@ class TestReadDatabase:
         assert EXPECTED_DATA3_DICT == pytest.approx(actual["data3"][3])
         assert EXPECTED_DATA4_DICT == actual["data4"][3]
         assert len(actual["data4"][3]["array"]) == 3
+        assert EXPECTED_DATA5_DICT == actual["data5"][3]
+        assert len(actual["data5"][3]["strArray"]) == 3
 
     def test_read_as_df(self, db_path):
         db = necstdb.opendb(db_path)
@@ -207,6 +236,8 @@ class TestReadDatabase:
         assert all(EXPECTED_DATA3_DF == actual["data3"].loc[3])
         assert all(EXPECTED_DATA4_DF == actual["data4"].loc[3])
         assert len(actual["data4"].loc[3, "array"]) == 3
+        assert all(EXPECTED_DATA5_DF == actual["data5"].loc[3])
+        assert len(actual["data5"].loc[3, "strArray"]) == 3
 
     def test_read_as_array(self, db_path):
         db = necstdb.opendb(db_path)
@@ -218,11 +249,13 @@ class TestReadDatabase:
         assert all(EXPECTED_DATA3_ARRAY == actual["data3"][3])
         assert all(EXPECTED_DATA4_ARRAY == actual["data4"][3])
         assert len(actual["data4"][3]["array"]) == 3
+        assert all(EXPECTED_DATA5_ARRAY == actual["data5"][3])
+        assert len(actual["data5"][3]["strArray"]) == 3
 
     def test_read_as_bytes(self, db_path):
         db = necstdb.opendb(db_path)
         actual = {name: db.open_table(name).read(astype="raw") for name in table_name}
-        formats = ["<bhiq", "<BHIQ", "<fd4sc", "<?3s3d"]
+        formats = ["<bhiq", "<BHIQ", "<fd4sc", "<?3s3d", "<3s3s3s"]
         unpacked = {
             k: tuple(struct.iter_unpack(fmt, v))
             for fmt, (k, v) in zip(formats, actual.items())
@@ -237,6 +270,7 @@ class TestReadDatabase:
         assert EXPECTED_DATA4_BYTE == actual["data4"][idx["data4"]]
         with pytest.raises(TypeError):
             assert len(unpacked["data4"][3][-1]) == 3
+        assert EXPECTED_DATA5_BYTE == actual["data5"][idx["data5"]]
 
     def test_read_file(self, db_path):
         db = necstdb.opendb(db_path)
@@ -343,7 +377,7 @@ def archive_dir_path(tmp_path_factory) -> Path:
 class TestMethods:
     def test_list_tables(self, db_path):
         db = necstdb.opendb(db_path)
-        assert db.list_tables() == ["data1", "data2", "data3", "data4"]
+        assert db.list_tables() == ["data1", "data2", "data3", "data4", "data5"]
 
     def test_checkout(self, db_path, archive_dir_path):
         db = necstdb.opendb(db_path)
@@ -361,6 +395,7 @@ class TestMethods:
                 ("data2", 330, 22, 15, "<BHIQ"),
                 ("data3", 594, 33, 17, "<fd4sc"),
                 ("data4", 1364, 44, 28, "<?3s3d"),
+                ("data5", 495, 55, 9, "<3s3s3s"),
             ],
             columns=[
                 "table name",
