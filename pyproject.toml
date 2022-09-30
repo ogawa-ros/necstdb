@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "necstdb"
-version = "0.2.7"
+version = "0.2.8"
 description = "Database for NECST."
 authors = ["Kaoru Nishikawa <k.nishikawa@a.phys.nagoya-u.ac.jp>"]
 license = "MIT"
