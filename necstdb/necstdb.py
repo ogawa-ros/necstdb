@@ -64,7 +64,9 @@ class necstdb:
 
     def list_tables(self) -> List[str]:
         """List all tables within the database."""
-        return sorted([table.stem for table in self.path.glob("*.data")])
+        data = [path.stem for path in self.path.glob("*.data")]
+        header = [path.stem for path in self.path.glob("*.header")]
+        return sorted(set(data) & set(header))
 
     def create_table(
         self, name: str, config: Dict[str, Any], endian: str = "<"
