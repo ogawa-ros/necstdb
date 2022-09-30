@@ -9,6 +9,7 @@ direction + ... + timestamp), etc.
 
 
 from typing import Union, List, Tuple, Dict, Any
+import re
 import os
 import mmap
 import struct
@@ -446,8 +447,15 @@ class table:
         """Read the data as numpy's structured array."""
         formats = [col["format"] for col in cols]
 
-        # numpy type strings for bytes are ["S", "a"]
-        np_formats = [self.endian + col["format"].replace("s", "a") for col in cols]
+        def parse_dtype(format_character: str) -> str:
+            format_character = re.sub(
+                r"^([\d+s]+)$",
+                lambda m: f"{m.group(1).count('s')}S{m.group(1).split('s')[0]}",
+                format_character,
+            )
+            return self.endian + format_character
+
+        np_formats = [parse_dtype(col["format"]) for col in cols]
         keys = [col["key"] for col in cols]
         offsets = utils.get_struct_indices(formats, self.endian)[:-1]
         dtype = numpy.dtype({"names": keys, "formats": np_formats, "offsets": offsets})
