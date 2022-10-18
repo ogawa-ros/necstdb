@@ -53,10 +53,11 @@ DATA4_HEADER = {
         {"key": "array", "format": "3d", "size": 24},
     ]
 }
-DATA5 = ([[b"abc", b"def", b"ghi"]] for _ in range(55))
+DATA5 = ([[b"abc", b"def", b"ghi"], b"jkl"] for _ in range(55))
 DATA5_HEADER = {
     "data": [
         {"key": "strArray", "format": "3s3s3s", "size": 9},
+        {"key": "strLenMismatch", "format": "5s", "size": 5},
     ]
 }
 
@@ -66,14 +67,17 @@ EXPECTED_DATA1_TUPLE = (3, -16, -32, -64)
 EXPECTED_DATA2_TUPLE = (3, 16, 32, 64)
 EXPECTED_DATA3_TUPLE = (0.32, 3, b"byte", b"c")
 EXPECTED_DATA4_TUPLE = (True, b"str", 3, TIME, TIME)
-EXPECTED_DATA5_TUPLE = (b"abc", b"def", b"ghi")
+EXPECTED_DATA5_TUPLE = (b"abc", b"def", b"ghi", b"jkl\x00\x00")
 
 # DTypes (int8, int16, ...) are not preserved.
 EXPECTED_DATA1_DICT = {"int8": 3, "int16": -16, "int32": -32, "int64": -64}
 EXPECTED_DATA2_DICT = {"uint8": 3, "uint16": 16, "uint32": 32, "uint64": 64}
 EXPECTED_DATA3_DICT = {"float32": 0.32, "float64": 3, "_byte": b"byte", "_char": b"c"}
 EXPECTED_DATA4_DICT = {"bool": True, "string": b"str", "array": (3, TIME, TIME)}
-EXPECTED_DATA5_DICT = {"strArray": (b"abc", b"def", b"ghi")}
+EXPECTED_DATA5_DICT = {
+    "strArray": (b"abc", b"def", b"ghi"),
+    "strLenMismatch": b"jkl\x00\x00",
+}
 
 # DTypes (int8, int16, ...) are not preserved.
 EXPECTED_DATA1_DF = pd.DataFrame(
@@ -88,7 +92,9 @@ EXPECTED_DATA3_DF = pd.DataFrame(
 EXPECTED_DATA4_DF = pd.DataFrame(
     [(True, b"str", [3, TIME, TIME])], columns=["bool", "string", "array"]
 )
-EXPECTED_DATA5_DF = pd.DataFrame([(["abc", "def", "ghi"],)], columns=["strArray"])
+EXPECTED_DATA5_DF = pd.DataFrame(
+    [(["abc", "def", "ghi"], "jkl\x00\x00")], columns=["strArray", "strLenMismatch"]
+)
 
 EXPECTED_DATA1_ARRAY = np.array(
     [(3, -16, -32, -64)],
@@ -107,8 +113,8 @@ EXPECTED_DATA4_ARRAY = np.array(
     dtype=[("bool", "?"), ("string", "S3"), ("array", "3f8")],
 )
 EXPECTED_DATA5_ARRAY = np.array(
-    [(["abc", "def", "ghi"],)],
-    dtype=[("strArray", "3S3")],
+    [(("abc", "def", "ghi"), "jkl\x00\x00")],
+    dtype=[("strArray", "(3,)S3"), ("strLenMismatch", "S5")],
 )
 
 EXPECTED_DATA1_BYTE = b"\x03\xf0\xff\xe0\xff\xff\xff\xc0\xff\xff\xff\xff\xff\xff\xff"
@@ -118,7 +124,7 @@ EXPECTED_DATA4_BYTE = (
     b"\x01str"
     b"\x00\x00\x00\x00\x00\x00\x08@\xea!\x1b\xc3\x1eJ\xd8A\xea!\x1b\xc3\x1eJ\xd8A"
 )
-EXPECTED_DATA5_BYTE = b"abcdefghi"
+EXPECTED_DATA5_BYTE = b"abcdefghijkl\x00\x00"
 
 
 @pytest.fixture(scope="module")
@@ -249,13 +255,13 @@ class TestReadDatabase:
         assert all(EXPECTED_DATA3_ARRAY == actual["data3"][3])
         assert all(EXPECTED_DATA4_ARRAY == actual["data4"][3])
         assert len(actual["data4"][3]["array"]) == 3
-        assert all(EXPECTED_DATA5_ARRAY == actual["data5"][3])
+        assert EXPECTED_DATA5_ARRAY == actual["data5"][3]
         assert len(actual["data5"][3]["strArray"]) == 3
 
     def test_read_as_bytes(self, db_path):
         db = necstdb.opendb(db_path)
         actual = {name: db.open_table(name).read(astype="raw") for name in table_name}
-        formats = ["<bhiq", "<BHIQ", "<fd4sc", "<?3s3d", "<3s3s3s"]
+        formats = ["<bhiq", "<BHIQ", "<fd4sc", "<?3s3d", "<3s3s3s5s"]
         unpacked = {
             k: tuple(struct.iter_unpack(fmt, v))
             for fmt, (k, v) in zip(formats, actual.items())
@@ -395,7 +401,7 @@ class TestMethods:
                 ("data2", 330, 22, 15, "<BHIQ"),
                 ("data3", 594, 33, 17, "<fd4sc"),
                 ("data4", 1364, 44, 28, "<?3s3d"),
-                ("data5", 495, 55, 9, "<3s3s3s"),
+                ("data5", 495, 55, 14, "<3s3s3s5s"),
             ],
             columns=[
                 "table name",
