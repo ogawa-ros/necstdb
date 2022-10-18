@@ -7,15 +7,14 @@ timestamp), various kinds of weather data (temperature + humidity + wind speed +
 direction + ... + timestamp), etc.
 """
 
-
-from typing import Union, List, Tuple, Dict, Any
-import re
-import os
-import mmap
-import struct
-import pathlib
 import json
+import mmap
+import os
+import pathlib
+import re
+import struct
 import tarfile
+from typing import Any, Dict, List, Tuple, Union
 
 import numpy
 import pandas
