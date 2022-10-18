@@ -7,20 +7,20 @@ timestamp), various kinds of weather data (temperature + humidity + wind speed +
 direction + ... + timestamp), etc.
 """
 
-
-from typing import Union, List, Tuple, Dict, Any
-import re
-import os
-import mmap
-import struct
-import pathlib
 import json
+import mmap
+import os
+import pathlib
+import re
+import struct
 import tarfile
+from typing import Any, Dict, List, Tuple, Union
 
 import numpy
 import pandas
 
 from . import utils
+from .recover import recover
 
 
 def duplicate_rename(path: pathlib.Path, _i: int = 0) -> pathlib.Path:
@@ -423,9 +423,12 @@ class table:
 
             for col in cols:
                 size = struct.calcsize(col["format"])
+                if "x" in col["format"]:  # Pad field
+                    offset += col["size"]
+                    continue
                 dat = struct.unpack(col["format"], data[offset : offset + size])
                 if len(dat) == 1:
-                    dat = dat[0]
+                    (dat,) = dat
 
                 dict_[col["key"]] = dat
                 offset += col["size"]
@@ -448,18 +451,28 @@ class table:
         formats = [col["format"] for col in cols]
 
         def parse_dtype(format_character: str) -> str:
+            def str_format(length: Union[str, int], count: Union[str, int]):
+                count = count if int(count) > 1 else ""
+                return f"{count}S{length}"
+
             format_character = re.sub(
                 r"^([\d+s]+)$",
-                lambda m: f"{m.group(1).count('s')}S{m.group(1).split('s')[0]}",
+                lambda m: str_format(m.group(1).split("s")[0], m.group(1).count("s")),
                 format_character,
             )
+
+            format_character = format_character.replace("x", "V")
             return self.endian + format_character
 
         np_formats = [parse_dtype(col["format"]) for col in cols]
         keys = [col["key"] for col in cols]
         offsets = utils.get_struct_indices(formats, self.endian)[:-1]
+
+        pad = ["x" in col["format"] for col in cols]
+        data_field = [k for k, p in zip(keys, pad) if not p]
+
         dtype = numpy.dtype({"names": keys, "formats": np_formats, "offsets": offsets})
-        return numpy.frombuffer(data, dtype=dtype)
+        return numpy.frombuffer(data, dtype=dtype)[data_field]
 
     @property
     def recovered(self) -> "table":
@@ -481,11 +494,7 @@ class table:
         such as 1e-308)
 
         """
-        self.endian = ""
-        self.open(self._name, self._mode)
-        for dat in self.header["data"]:
-            dat["format"] = dat["format"].replace("i", "?")
-        return self
+        return recover(self)
 
 
 def opendb(path: os.PathLike, mode: str = "r") -> "necstdb":
