@@ -428,7 +428,7 @@ class table:
                     continue
                 dat = struct.unpack(col["format"], data[offset : offset + size])
                 if len(dat) == 1:
-                    dat = dat[0]
+                    (dat,) = dat
 
                 dict_[col["key"]] = dat
                 offset += col["size"]
@@ -451,9 +451,13 @@ class table:
         formats = [col["format"] for col in cols]
 
         def parse_dtype(format_character: str) -> str:
+            def str_format(length: Union[str, int], count: Union[str, int]):
+                count = count if int(count) > 1 else ""
+                return f"{count}S{length}"
+
             format_character = re.sub(
                 r"^([\d+s]+)$",
-                lambda m: f"{m.group(1).count('s')}S{m.group(1).split('s')[0]}",
+                lambda m: str_format(m.group(1).split("s")[0], m.group(1).count("s")),
                 format_character,
             )
 
