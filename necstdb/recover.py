@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from typing import TYPE_CHECKING
 
 import numpy
@@ -8,7 +6,7 @@ if TYPE_CHECKING:
     from .necstdb import table
 
 
-def recover(t: table) -> table:
+def recover(t: "table") -> "table":
     fmt = "".join([d["format"] for d in t.header["data"]])
 
     if (t.endian == "<") and ("i" in fmt):
