@@ -11,4 +11,5 @@ except:
     __version__ = None
 
 from .necstdb import opendb
+from .necstdb import relog
 from . import utils
