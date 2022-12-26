@@ -518,9 +518,9 @@ def relog(db:necstdb, startttime:float, endtime:float):
     db: necstdb
         Original necstdb to be subtracted
     starttime: float
-        Start subtraction from this argument
+        Start subtraction from this time
     endtime: float
-        End subtraction from this argument
+        End subtraction from this time
 
     """
     newdb = opendb(db.path.stem + "_extracted", mode="w")
