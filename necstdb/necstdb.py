@@ -545,4 +545,3 @@ def relog(db:necstdb, startttime:float, endtime:float):
 
         newtable.close()
     newdb.save_file(path=db.path.stem + "_extracted", content="subtracted database")
-
