@@ -39,7 +39,11 @@ jobs:
         run: poetry run black --check tests ${PACKAGE_NAME}
 
       - name: Test with pytest
+<<<<<<< HEAD
         run: poetry run pytest -v tests ${PACKAGE_NAME}
 
       - name: Test with pytest
         run: poetry run pytest -n auto -v tests ${PACKAGE_NAME}
+=======
+        run: poetry run pytest -v tests ${PACKAGE_NAME}
+>>>>>>> 4902325a02efe0c7514eb6818006b29885aad8ae
