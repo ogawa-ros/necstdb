@@ -510,8 +510,9 @@ def opendb(path: os.PathLike, mode: str = "r") -> "necstdb":
     """
     return necstdb(path, mode)
 
-def relog(db:necstdb, startttime:float, endtime:float):
-    """Create time-subtracted new necstdb. 
+
+def relog(db: necstdb, starttime: float, endtime: float):
+    """Create time-subtracted necstdb.
 
     Parameters
     ----------
@@ -531,7 +532,7 @@ def relog(db:necstdb, startttime:float, endtime:float):
         data = table.read(astype="df")
         timestamp_key = "time"
         t = data[timestamp_key].astype(float)
-        idx = t[(startttime <= t) & (t <= endtime)].index
+        idx = t[(starttime <= t) & (t <= endtime)].index
         extracted_data = data.iloc[idx]
 
         header = table.header
