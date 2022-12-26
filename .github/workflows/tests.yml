@@ -7,27 +7,36 @@ on:
     branches: [ master, '**v[0-9]+.[0-9]+.*']
 
 jobs:
-  test:
+  job:
     name: Test
-    env:
-      PACKAGE_NAME: necstdb
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: [3.6, 3.7, 3.8, 3.9]
+        python-version: [3.7, 3.8, 3.9, "3.10"]
+    env:
+      PACKAGE_NAME: necstdb
     steps:
-      - uses: actions/checkout@v2
+      - name: Checkout the repository
+        uses: actions/checkout@v3
+
+      - name: Install Poetry
+        run: pip install poetry
+
       - name: Setup Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v2
+        uses: actions/setup-python@v4
         with:
           python-version: ${{ matrix.python-version }}
+          cache: "poetry"
+
       - name: Install dependencies
-        run: |
-          pip3 install poetry
-          poetry install
-      - name: Lint by Flake8
-        run: poetry run flake8 tests ${{ env.PACKAGE_NAME }}
-      - name: Format by Black
-        run: poetry run black --check tests ${{ env.PACKAGE_NAME }}
-      - name: Test by pytest
-        run: poetry run pytest -v tests ${{ env.PACKAGE_NAME }}
+        run: poetry install
+
+      - name: Lint with Flake8
+        run: poetry run flake8 tests ${PACKAGE_NAME}
+
+      - name: Format with Black
+        if: ${{ matrix.python-version }} != 3.6
+        run: poetry run black --check tests ${PACKAGE_NAME}
+
+      - name: Test with pytest
+        run: poetry run pytest -n auto -v tests ${PACKAGE_NAME}
