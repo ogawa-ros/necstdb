@@ -348,7 +348,8 @@ class TestPartialRead:
 
         assert len(actual) == 5
         assert len(actual[0]) == 2
-        assert all(actual[0] == EXPECTED_DATA4_ARRAY[["array", "bool"]])
+        for column in ["array", "bool"]:
+            assert (actual[0][column] == EXPECTED_DATA4_ARRAY[column]).all()
 
     def test_partial_read_as_bytes(self, db_path):
         db = necstdb.opendb(db_path)
