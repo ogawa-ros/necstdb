@@ -15,7 +15,7 @@ import re
 import struct
 import tarfile
 from typing import Any, Dict, List, Tuple, Union
-
+import xarray
 import numpy
 import pandas
 
@@ -286,7 +286,7 @@ class table:
 
     def read(
         self, num: int = -1, start: int = 0, cols: List[str] = [], astype: str = "tuple"
-    ) -> Union[tuple, dict, numpy.ndarray, pandas.DataFrame, bytes]:
+    ) -> Union[tuple, dict, numpy.ndarray, pandas.DataFrame, bytes, xarray.DataArray]:
         """Read the contents of the table.
 
         Parameters
@@ -361,7 +361,7 @@ class table:
 
     def _astype(
         self, data: bytes, cols: List[Dict[str, Any]], astype: str
-    ) -> Union[tuple, dict, numpy.ndarray, pandas.DataFrame, bytes]:
+    ) -> Union[tuple, dict, numpy.ndarray, pandas.DataFrame, bytes,xarray.DataArray]:
         """Map the astype argument to corresponding methods."""
         if cols == []:
             cols = self.header["data"]
@@ -398,6 +398,13 @@ class table:
                 return self._astype_data_frame(data, cols)
             except struct.error as e:
                 raise DataFormatError(e)
+        
+        elif astype in ["xr","xarray","x"]:
+            try:
+                return self._astype_xarray(data, cols)
+            except struct.error as e:
+                raise DataFormatError(e)
+
 
         elif astype in ["buffer", "raw"]:
             return data
@@ -474,6 +481,15 @@ class table:
         dtype = numpy.dtype({"names": keys, "formats": np_formats, "offsets": offsets})
         return numpy.frombuffer(data, dtype=dtype)[data_field]
 
+
+    def _astype_xarray(
+        self, data: bytes, cols: List[Dict[str, Any]]
+    ) -> xarray.DataArray:
+        data = self._astype_data_frame(data, cols)
+        return data.to_xarray()
+
+
+    
     @property
     def recovered(self) -> "table":
         """Restore the broken data caused by bugs in logger.
