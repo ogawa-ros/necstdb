@@ -398,7 +398,7 @@ class table:
                 return self._astype_data_frame(data, cols)
             except struct.error as e:
                 raise DataFormatError(e)
-        
+
         elif astype in ["xr", "xarray", "x"]:
             try:
                 return self._astype_xarray(data, cols)
