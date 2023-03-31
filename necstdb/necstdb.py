@@ -484,7 +484,7 @@ class table:
         self, data: bytes, cols: List[Dict[str, Any]]
     ) -> xarray.DataArray:
         data_ = self._astype_data_frame(data, cols)
-        data = data_.set_index('timestamp')
+        data = data_.set_index("timestamp")
         return data.to_xarray()
 
     @property
