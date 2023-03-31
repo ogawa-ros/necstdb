@@ -286,7 +286,7 @@ class table:
 
     def read(
         self, num: int = -1, start: int = 0, cols: List[str] = [], astype: str = "tuple"
-    ) -> Union[tuple, dict, numpy.ndarray, pandas.DataFrame, bytes, xarray.DataArray]:
+    ) -> Union[tuple, dict, numpy.ndarray, pandas.DataFrame, xarray.DataArray, bytes]:
         """Read the contents of the table.
 
         Parameters
@@ -361,7 +361,7 @@ class table:
 
     def _astype(
         self, data: bytes, cols: List[Dict[str, Any]], astype: str
-    ) -> Union[tuple, dict, numpy.ndarray, pandas.DataFrame, bytes,xarray.DataArray]:
+    ) -> Union[tuple, dict, numpy.ndarray, pandas.DataFrame, xarray.DataArray, bytes]:
         """Map the astype argument to corresponding methods."""
         if cols == []:
             cols = self.header["data"]
