@@ -398,7 +398,7 @@ class table:
                 return self._astype_data_frame(data, cols)
             except struct.error as e:
                 raise DataFormatError(e)
-            
+        
         elif astype in ["xr", "xarray", "x"]:
             try:
                 return self._astype_xarray(data, cols)
@@ -485,9 +485,8 @@ class table:
     ) -> xarray.DataArray:
         data_ = self._astype_data_frame(data, cols)
         data = data_.set_index('timestamp')
-
         return data.to_xarray()
-    
+
     @property
     def recovered(self) -> "table":
         """Restore the broken data caused by bugs in logger.
