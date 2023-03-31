@@ -15,8 +15,8 @@ import re
 import struct
 import tarfile
 from typing import Any, Dict, List, Tuple, Union
-import xarray
 import numpy
+import xarray
 import pandas
 
 from . import utils
