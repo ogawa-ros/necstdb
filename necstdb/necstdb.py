@@ -480,16 +480,16 @@ class table:
         dtype = numpy.dtype({"names": keys, "formats": np_formats, "offsets": offsets})
         return numpy.frombuffer(data, dtype=dtype)[data_field]
 
-
     def _astype_xarray(
         self, data: bytes, cols: List[Dict[str, Any]]
     ) -> xarray.DataArray:
         data_ = self._astype_data_frame(data, cols)
         data =data_.set_index('timestamp')
+
         return data.to_xarray()
-
-
+    
     @property
+    
     def recovered(self) -> "table":
         """Restore the broken data caused by bugs in logger.
 
