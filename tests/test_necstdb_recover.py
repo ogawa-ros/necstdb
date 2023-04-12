@@ -1,10 +1,11 @@
+import xarray
+
 import pathlib
 
 import pytest
 
 import necstdb
 
-import xarray
 
 
 @pytest.fixture

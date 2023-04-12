@@ -1,5 +1,6 @@
-from necstdb import utils
 import xarray
+
+from necstdb import utils
 
 TEST_FORMATS = ["d", "?", "3f", "3s", "b"]
 
