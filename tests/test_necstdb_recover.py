@@ -4,6 +4,8 @@ import pytest
 
 import necstdb
 
+import xarray
+
 
 @pytest.fixture
 def db_path(tmp_path_factory) -> pathlib.Path:
