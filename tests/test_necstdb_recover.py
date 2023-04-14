@@ -5,7 +5,6 @@ import pytest
 import necstdb
 
 
-
 @pytest.fixture
 def db_path(tmp_path_factory) -> pathlib.Path:
     """Path to temporary database directory."""
