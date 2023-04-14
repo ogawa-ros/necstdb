@@ -1,5 +1,3 @@
-import xarray
-
 import pathlib
 
 import pytest
