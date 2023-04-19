@@ -23,7 +23,6 @@ from . import utils
 from .recover import recover
 
 
-
 def duplicate_rename(path: pathlib.Path, _i: int = 0) -> pathlib.Path:
     """Return nonexistent path for new file.
 
