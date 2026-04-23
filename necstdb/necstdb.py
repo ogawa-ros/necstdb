@@ -303,7 +303,10 @@ class table:
             "raw"].
 
         """
-        mm = mmap.mmap(self.data_file.fileno(), 0, prot=mmap.PROT_READ)
+        if hasattr(mmap, "PROT_READ"):   # Linux/macOS
+            mm = mmap.mmap(self.data_file.fileno(), 0, prot=mmap.PROT_READ)
+        else:  # Windows
+            mm = mmap.mmap(self.data_file.fileno(), 0, access=mmap.ACCESS_READ)
         mm.seek(start * self.record_size)
 
         if cols == []:

@@ -7,28 +7,27 @@ license = "MIT"
 readme = "README.md"
 homepage = "https://github.com/ogawa-ros/necstdb"
 repository = "https://github.com/ogawa-ros/necstdb"
-classifiers=[
+
+classifiers = [
     "Operating System :: POSIX :: Linux",
     "Operating System :: MacOS :: MacOS X",
-    "Programming Language :: Python",
     "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.12",
     "License :: OSI Approved :: MIT License",
     "Topic :: Software Development :: Libraries :: Python Modules",
 ]
 
 [tool.poetry.dependencies]
-python = "^3.6.1"
-numpy = [
-    { version = "^1.19", python = "<3.8" },
-    { version = "^1.22", python = ">=3.8" },
-]
-pandas = "^1.1"
+python = ">=3.12,<3.13"
 
-[tool.poetry.dev-dependencies]
-pytest = "^6.1.0"
-black = "^20.8b"
-flake8 = "^3.8.0"
+numpy = ">=1.26.4,<3.0"
+pandas = ">=2.2.2,<3.0"
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^8.0"
+black = "^24.3"
+flake8 = "^7.0"
 
 [build-system]
-requires = ["poetry-core>=1.0.0"]
+requires = ["poetry-core>=1.8.0"]
 build-backend = "poetry.core.masonry.api"
