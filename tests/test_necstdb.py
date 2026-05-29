@@ -157,18 +157,22 @@ class TestWriteDatabase:
         for data in DATA4:
             flat_data = []
             _ = [
-                flat_data.extend(dat)
-                if isinstance(dat, list)
-                else flat_data.append(dat)
+                (
+                    flat_data.extend(dat)
+                    if isinstance(dat, list)
+                    else flat_data.append(dat)
+                )
                 for dat in data
             ]  # Flatten the data.
             tables["data4"].append(*flat_data)
         for data in DATA5:
             flat_data = []
             _ = [
-                flat_data.extend(dat)
-                if isinstance(dat, list)
-                else flat_data.append(dat)
+                (
+                    flat_data.extend(dat)
+                    if isinstance(dat, list)
+                    else flat_data.append(dat)
+                )
                 for dat in data
             ]  # Flatten the data.
             tables["data5"].append(*flat_data)
@@ -338,7 +342,8 @@ class TestPartialRead:
 
         assert len(actual) == 5
         assert len(actual.loc[0]) == 2
-        assert all(actual.loc[0] == EXPECTED_DATA4_DF[["array", "bool"]])
+        assert list(actual.loc[0]["array"]) == list(EXPECTED_DATA4_DF.loc[0]["array"])
+        assert actual.loc[0]["bool"] == EXPECTED_DATA4_DF.loc[0]["bool"]
 
     def test_partial_read_as_array(self, db_path):
         db = necstdb.opendb(db_path)
