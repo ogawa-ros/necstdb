@@ -342,7 +342,8 @@ class TestPartialRead:
 
         assert len(actual) == 5
         assert len(actual.loc[0]) == 2
-        assert actual.loc[0].equals(EXPECTED_DATA4_DF.loc[0, ["array", "bool"]])
+        assert list(actual.loc[0]["array"]) == list(EXPECTED_DATA4_DF.loc[0]["array"])
+        assert actual.loc[0]["bool"] == EXPECTED_DATA4_DF.loc[0]["bool"]
 
     def test_partial_read_as_array(self, db_path):
         db = necstdb.opendb(db_path)
