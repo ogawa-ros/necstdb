@@ -157,18 +157,22 @@ class TestWriteDatabase:
         for data in DATA4:
             flat_data = []
             _ = [
-                flat_data.extend(dat)
-                if isinstance(dat, list)
-                else flat_data.append(dat)
+                (
+                    flat_data.extend(dat)
+                    if isinstance(dat, list)
+                    else flat_data.append(dat)
+                )
                 for dat in data
             ]  # Flatten the data.
             tables["data4"].append(*flat_data)
         for data in DATA5:
             flat_data = []
             _ = [
-                flat_data.extend(dat)
-                if isinstance(dat, list)
-                else flat_data.append(dat)
+                (
+                    flat_data.extend(dat)
+                    if isinstance(dat, list)
+                    else flat_data.append(dat)
+                )
                 for dat in data
             ]  # Flatten the data.
             tables["data5"].append(*flat_data)
